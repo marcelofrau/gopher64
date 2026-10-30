@@ -42,15 +42,21 @@ flowchart LR
 
 **Goal:** prove the renderer logic works on Dozen before investing in UWP. No code changes in gopher64.
 
-- [ ] Create branch `uwp/main` from `main` (D-16); commit `docs/xbox-port/`
-- [ ] `git submodule update --init --recursive` (parallel-rdp ✔ already; rcheevos, sse2neon, libadrenotools)
+**2026-10-30 checkpoint:** desktop build and native SM64 succeeded; SM64 renders
+correctly on Dozen 26.2.4 / NVIDIA with `UBERSHADER=1`, required 8-bit storage,
+external host import disabled and single-threaded commands. All 237 RDP suites
+passed a reduced run with that configuration. P0 remains open: see
+[handoff and next steps](14-p0-handoff.md) and [results](13-testing-debugging.md#p0-results).
+
+- [x] Create branch `uwp/main` from `main` (D-16); commit `docs/xbox-port/` (`1d0394a`)
+- [x] `git submodule update --init --recursive` (all pinned submodules initialised)
 - [ ] Build desktop gopher64 as upstream does (`cargo build --release`) and run SM64 on the native driver (baseline screenshots + FPS)
-- [ ] Install the Vulkan SDK (for `vulkaninfo`) or use `vulkaninfo` from the GPU driver package
-- [ ] Obtain desktop Dozen: build `mesa-uwp` **without** `--uwp` (desktop target) with meson-uwp, or use a mesa-dist-win release (MIT); keep `vulkan_dzn.dll` + `dzn_icd.x86_64.json`
-- [ ] `VK_DRIVER_FILES=…\dzn_icd.x86_64.json vulkaninfo --summary` shows only `Microsoft Direct3D12 (…)`, `driverID = MESA_DOZEN`
+- [x] Install the Vulkan SDK (for `vulkaninfo`) or use `vulkaninfo` from the GPU driver package
+- [x] Obtain desktop Dozen: build `mesa-uwp` **without** `--uwp` (desktop target) with meson-uwp, or use a prebuilt desktop release; keep `vulkan_dzn.dll` + `dzn_icd.x86_64.json`
+- [x] `VK_DRIVER_FILES=…\dzn_icd.x86_64.json vulkaninfo --summary` shows only `Microsoft Direct3D12 (…)`, `driverID = MESA_DOZEN`
 - [ ] Run gopher64 on Dozen: SM64, MK64, Zelda OoT, GoldenEye (title screen + 2 min gameplay each); compare with baseline
 - [ ] Repeat with `PARALLEL_RDP_ALLOW_EXTERNAL_HOST=0` (Xbox-like incoherent RDRAM)
-- [ ] Repeat with `PARALLEL_RDP_SUBGROUP=0`, then `dzn_enable_8bit_loads_stores=true`
+- [ ] Enable `dzn_enable_8bit_loads_stores=true` (required); repeat with `PARALLEL_RDP_SUBGROUP=0`
 - [ ] Test save state → load state round trip on Dozen (exercises TMEM/hidden RDRAM `memcpy`)
 - [ ] Test upscale 2× and 4×
 - [ ] Capture the feature dump ([04 §6](04-vulkan-dozen.md#6-startup-diagnostics-to-log-always-on-every-boot)) — add a temporary log patch if needed
@@ -118,6 +124,7 @@ flowchart LR
 - [ ] (Shortcut for first light) try RetroArch's prebuilt mesa-uwp `vulkan_dzn.dll` + `dxil.dll`
 - [ ] Port M-06 (log hook) first — every later step depends on Mesa logs in our log file
 - [ ] Port M-01 (write-combined memory) and M-02 (DXIL validation/self-sign)
+- [ ] Enable required 8-bit storage (M-09) and verify 8/16-bit storage on both consoles
 - [ ] Package `vulkan_dzn.dll`, `dxil.dll`
 - [ ] Console smoke tests (before running a game):
   - [ ] Feature dump logged (Q-02 16-bit/WaveOps, Q-03 `ID3D12Device13`, Q-09 device type)

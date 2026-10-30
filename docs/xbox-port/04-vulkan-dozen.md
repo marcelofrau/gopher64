@@ -41,6 +41,7 @@ Verified in `parallel-rdp/parallel-rdp-standalone` at submodule commit `9ba7406d
 | `maxUniformBufferRange ≥ VULKAN_MAX_UBO_SIZE` | `vulkan/context.cpp:912` | ✔ (D3D12 CBV 64 KiB) — confirm in P0 log |
 | `VK_KHR_swapchain` + a surface the GPU can present to | `vulkan/wsi.hpp:57-60`, `context.cpp:1005-1013` | ✔ via win32 surface (UWP-patched) |
 | RDRAM buffer allocation succeeds (import or fallback) | `rdp_device.cpp:113-114,177-181` | ✔ fallback path always available |
+| `storageBuffer8BitAccess` and `storageBuffer16BitAccess` | `rdp_renderer.cpp:168-177` | 8-bit storage is off by default; enable `dzn_enable_8bit_loads_stores` and verify both on Xbox |
 
 ### 2.2 Optional features (used when present, with a fallback)
 
@@ -48,11 +49,11 @@ Verified in `parallel-rdp/parallel-rdp-standalone` at submodule commit `9ba7406d
 |---------|----------|----------|----------------|
 | `VK_EXT_external_memory_host` | Import gopher64's RDRAM (`alloc_zeroed`, 64 KiB aligned, `src/device/rdram.rs:152-158`) directly into the GPU address space → zero-copy coherent RDRAM | **Incoherent mode**: GPU-side RDRAM copy (2× size, with write mask), page tracking and explicit host↔GPU resolves inside the renderer (`rdp_device.cpp:93-111`; `rdp_renderer.cpp:2991-3023`, `resolve_coherency_*`). Slower, functionally complete. | Only if `ID3D12Device13` is available (`dzn_device.c:149`, `OpenExistingHeapFromAddress1`). **Assume absent on Xbox.** |
 | Timeline semaphores | Granite's internal sync; `CommandProcessor::signal_timeline/wait_for_timeline` | Granite falls back to binary semaphores/fences (`vulkan/device.cpp:94,147,1066-1068`) | ✔ always (`dzn_device.c:143,780`) |
-| `shaderInt16` + `shaderInt8` (+ 8/16-bit storage) | "SMALL_TYPES" shader variants — more efficient | 32-bit arithmetic everywhere (`rdp_renderer.cpp:213-225`) | 16-bit ✔ if D3D12 `Native16BitShaderOpsSupported`; 8-bit **off by default** (driconf `dzn_enable_8bit_loads_stores`, `dzn_device.c:668`) |
+| `shaderInt16` + `shaderInt8` arithmetic | "SMALL_TYPES" shader variants — more efficient | 32-bit arithmetic (`rdp_renderer.cpp:213-225`); 8/16-bit storage remains mandatory | Depends on D3D12 capabilities and `dzn_enable_8bit_loads_stores` |
 | Subgroups: basic, vote, ballot, arithmetic in compute; min size 32 & ≤ 64 | Tile binning and depth-blend fast paths (`rdp_renderer.cpp:228-247`) | Non-subgroup shader variants | ✔ all four ops (`dzn_device.c:986-993`); `subgroupSize = WaveLaneCountMin` (RDNA2: 32 expected) |
 | `VK_EXT_subgroup_size_control` | Force wave size for binning | Default size | ✔ if WaveOps + SM6.6 (`dzn_device.c:798`) |
 
-**Conclusion:** the minimum viable configuration is plain Vulkan 1.1 compute + a swapchain. Everything Dozen might lack has a defined fallback inside parallel-rdp. This is why Dozen is viable here even though it is not for many other emulators (which need geometry/tessellation features, exotic formats, or bindless at scale).
+**Correction, 2026-10-30:** Vulkan 1.1 compute and a swapchain alone are not sufficient: parallel-rdp explicitly requires both 8- and 16-bit storage buffer access. On desktop Dozen 26.2.6, the default 8-bit setting makes initialisation fail; enabling it exposes the feature, but does not by itself prove the renderer works. Xbox support remains unverified.
 
 ### 2.3 parallel-rdp environment knobs useful for testing
 
@@ -189,7 +190,7 @@ Base: **SternXD `mesa-uwp` 26.2.2** (`34732bbc207`, already has the CoreWindow W
 | M-06 | Application log hook (`*_set_log_hook`) + name the call after which the device was removed | OnyxEMU `0005`–`0007`, `0010`, `0012`, `0022`, `0024` | Diagnosability without a debugger | High |
 | M-07 | Descriptor pool heap sizing | OnyxEMU `0009`, `0020` | Heap limits | Medium |
 | M-08 | Fence value checks while waiting | OnyxEMU `0019` | Robust timeline waits | Medium |
-| M-09 | Default `dzn_enable_8bit_loads_stores = true`; consider 8/16-bit storage without native 16-bit ops + narrow subgroup lowering | own; idea from `Cosmo/mesa_ai_slop_version` (unlicensed — reimplement, don't copy) | parallel-rdp SMALL_TYPES fast path | Medium (perf) |
+| M-09 | Enable `dzn_enable_8bit_loads_stores`; consider 8/16-bit storage without native 16-bit ops + narrow subgroup lowering | own; idea from `Cosmo/mesa_ai_slop_version` (unlicensed — reimplement, don't copy) | 8-bit storage is required for parallel-rdp initialisation | **Critical (P3)** |
 | M-10 | CoreWindow lookup fallback to `MainView()` | own | Worker-thread swapchain creation | Low (only if D-06 changes) |
 | M-11 | Xbox D3D12 quirks found in P3 (e.g. typed UAV loads for 32 bpp formats — Azahar's `azahar-xbox-uav-cast.patch`) | as discovered | Correctness | As needed |
 
@@ -260,7 +261,14 @@ Logged to `{root}\logs\gopher64.log` after device creation:
 
 ## 7. P0 — validating Dozen on a Windows PC (before any Xbox work)
 
-The whole Vulkan risk can be retired on a desktop: the desktop build already loads Vulkan through `SDL_Vulkan_LoadLibrary` → `vulkan-1.dll` (the Khronos loader), which honours `VK_DRIVER_FILES`.
+**2026-10-30 result:** SM64 rendered correctly on NVIDIA with mesa-dist-win
+Dozen 26.2.4, required 8-bit storage enabled, `ALLOW_EXTERNAL_HOST=0`,
+`SINGLE_THREADED_COMMAND=1` and `UBERSHADER=1` set before launch. The default
+split renderer was corrupted. Ubershader passed 237 reduced RDP suites on NVIDIA,
+but Intel gameplay remained corrupted. Root cause and performance are unverified;
+see [checkpoint and reproduction](14-p0-handoff.md).
+
+The renderer's basic Dozen compatibility can be tested on a desktop: the desktop build already loads Vulkan through `SDL_Vulkan_LoadLibrary` → `vulkan-1.dll` (the Khronos loader), which honours `VK_DRIVER_FILES`. This does not retire the Xbox-specific risks listed below.
 
 ```mermaid
 flowchart LR
@@ -270,19 +278,22 @@ flowchart LR
     D -->|"yes"| E["Repeat with<br/>PARALLEL_RDP_ALLOW_EXTERNAL_HOST=0<br/>(Xbox-like)"]
     E --> F{"Still correct?<br/>Speed OK?"}
     F -->|"yes"| GO["GO → P1"]
-    D -->|"no"| T["Triage: subgroup=0, ubershader=1,<br/>8-bit on/off; file Mesa bugs"]
+    D -->|"no"| T["Triage: subgroup=0, ubershader=1,<br/>small types=0; investigate Mesa"]
     F -->|"no"| T
     T --> K{"Fixable in<br/>Mesa/our fork?"}
     K -->|"yes"| C
     K -->|"no"| STOP["NO-GO: re-plan renderer<br/>(see 09-risks R-01)"]
 ```
 
-Commands (PowerShell, from the repo root). Machine-specific locations come from environment variables, never hard-coded paths: `GOPHER64_ROMS` = your ROM folder; the desktop Dozen build/extract goes to `out\dzn-desktop\` (git-ignored).
+Commands (PowerShell, from the repo root). Machine-specific locations come from environment variables, never hard-coded paths: `GOPHER64_ROMS` = your ROM folder; the desktop Dozen build/extract goes to `out\dzn-desktop\` (exclude it locally or use an isolated temporary directory).
+
+Before running games, use an isolated copy of the executable with a `portable.txt` file beside it. Otherwise gopher64 uses the user's normal config and save directories. Copy only test saves into the isolated directory if needed.
 
 ```powershell
 # 1. Point the Khronos loader at Dozen only
 $env:VK_DRIVER_FILES = (Resolve-Path "out\dzn-desktop\share\vulkan\icd.d\dzn_icd.x86_64.json").Path
 $env:VK_LOADER_DEBUG = "driver"          # optional: confirm dzn is the only driver
+$env:dzn_enable_8bit_loads_stores = "true" # required by parallel-rdp
 vulkaninfo --summary                      # expect: deviceName "Microsoft Direct3D12 (<GPU>)", driverID MESA_DOZEN
 
 # 2. Run gopher64 (desktop build, no code change)
@@ -295,7 +306,6 @@ cargo run --release -- "$env:GOPHER64_ROMS\Super Mario 64 (U).z64"
 # 4. Variants for triage
 $env:PARALLEL_RDP_SUBGROUP = "0"
 $env:PARALLEL_RDP_UBERSHADER = "1"
-$env:dzn_enable_8bit_loads_stores = "true"   # driconf option via env (desktop)
 ```
 
 Record results in [13 — Testing](13-testing-debugging.md#p0-results). Note the PC GPU vendor: Dozen on an AMD RDNA desktop GPU is the closest proxy for the Series GPU; NVIDIA/Intel results are still useful for functional correctness.

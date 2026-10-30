@@ -59,13 +59,23 @@
 
 Fill in during P0.
 
+2026-10-30 preliminary setup: the prebuilt [mmozeiko/build-mesa 26.2.6](https://github.com/mmozeiko/build-mesa/releases/tag/26.2.6) `mesa-dzn-x64` archive passed its published SHA-256 check. With `VK_DRIVER_FILES` set to its manifest, `vulkaninfo --summary` reported Dozen 26.2.6 for NVIDIA RTX 3500 Ada, Intel Arc and Microsoft Basic Render Driver. The NVIDIA device exposes `VK_EXT_external_memory_host`; actual coherent-mode use remains to be verified in the renderer. No game result is implied by this setup check.
+
 | Date | PC GPU / driver | Dozen build | Mode | Game | Result | Speed | Notes |
 |------|-----------------|-------------|------|------|--------|-------|-------|
-| | | | native Vulkan (baseline) | SM64 | | | |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | n/a | native Vulkan (baseline) | SM64 | User reports image and audio working | not measured | portable data directory |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | n/a | native Vulkan, `ALLOW_EXTERNAL_HOST=0` | SM64 | User reports correct rendering, no visible faults | not measured | Control for the incoherent RDRAM path; normal exit |
 | | | | Dozen, coherent | SM64 | | | |
 | | | | Dozen, `ALLOW_EXTERNAL_HOST=0` | SM64 | | | |
-| | | | Dozen, `SUBGROUP=0` | SM64 | | | |
-| | | | Dozen, 8-bit on | SM64 | | | |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled, `SUBGROUP=0` | SM64 | Severe visual corruption persists | not measured | User screenshots |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | Mesa Dozen 26.2.6 | Dozen, default 8-bit off | SM64 | Fails to initialise: 8-bit storage required | n/a | `storageBuffer8BitAccess` is mandatory |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | Mesa Dozen 26.2.6 | Dozen, 8-bit on, external host disabled | SM64 | Access violation during startup | n/a | Also fails with 26.2.4 `dxil.dll` directory on PATH; no visual result |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled | SM64 | Severe visual corruption in menus and gameplay | not measured | User screenshots; process exited normally |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled, `SMALL_TYPES=0` | SM64 | Severe visual corruption persists | not measured | User screenshots |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled, `SINGLE_THREADED_COMMAND=1` inherited at startup | SM64 | Severe visual corruption persists | not measured | C++ log confirms single-threaded command processing; normal exit |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled, `SINGLE_THREADED_COMMAND=1`, `UBERSHADER=1` | SM64 | User confirms perfect rendering | not measured | Normal exit (0); first visually successful Dozen configuration |
+| 2026-10-30 | Intel Arc Pro / 101.8860 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled | SM64 | Visual corruption persists | not measured | User reports improved 3D but worse 2D; screenshots |
+| 2026-10-30 | Intel Arc Pro / 101.8860 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled, `UBERSHADER=1` | SM64 | Visual corruption persists | not measured | User reports similar result to previous Intel test |
 | | | | … | MK64 / OoT / GE | | | |
 
 Feature dump (paste from log):
@@ -74,6 +84,39 @@ Feature dump (paste from log):
 (device name, apiVersion, driverID, subgroupSize, ops, int16/int8, 8/16-bit storage,
  timeline, ext-mem-host, memory heaps, parallel-rdp caps chosen)
 ```
+
+### P0 automated renderer investigation (2026-10-30)
+
+Built upstream paraLLEl-RDP `395da8f0b896a3158987dcdcdeabfefbad59366d`
+(the standalone tree's `COMMIT`) with its pinned Granite and Angrylion submodules.
+`rdp_renderer.cpp`, `rdp_device.cpp` and `video_interface.cpp` match the emulator's
+copies byte-for-byte. The suite compiles shaders at runtime, whereas gopher64 uses
+embedded SPIR-V, so passing here still requires an emulator check.
+
+On NVIDIA, with `PARALLEL_RDP_ALLOW_EXTERNAL_HOST=0` and
+`PARALLEL_RDP_SINGLE_THREADED_COMMAND=1` inherited at startup:
+
+| Test | Native Vulkan | mesa-dist-win Dozen 26.2.4, 8-bit storage enabled |
+|------|---------------|-----------------------------------------------|
+| `rdp-conformance --suite fill-16 --range 0 10` | Pass | Fails at iteration 0: RDRAM dword 3888, expected `0`, got `0x10001` |
+| Same failing case with `SUBGROUP=0`, `SMALL_TYPES=0`, both together, or `DZN_DEBUG=nobindless` | not run | Same first mismatch |
+| `fill-16`, `fill-8`, `fill-32`, `rasterization-noaa`, `tex-rect`, range 0–10, `FORCE_SYNC_SHADER=1` | not run | All fail |
+| Same five suites, range 0–10, `UBERSHADER=1` | not run | All pass |
+| `texture-load-tile-16` and `texture-load-tile-8`, default shader path | not run | Pass |
+| `rdp-conformance --range 0 10`, `UBERSHADER=1` | not run | All 237 suites pass (reduced iteration count) |
+| `vi-conformance --suite aa-none-rgba5551 --range 0 10`, `UBERSHADER=1` | not run | Pass |
+
+This reproduces incorrect rendering without gopher64, ROM input or presentation.
+The split rasterization/depth-blend path fails while the combined ubershader path
+passes these tests. This does **not** yet identify the faulty compiler pass or
+barrier: ubershader changes both shader specialization and the dispatch structure.
+The user confirmed perfect SM64 rendering with NVIDIA + ubershader in gopher64;
+the process exited normally. Intel already showed corruption with ubershader.
+Performance, other games, savestates and upscaling remain unverified. No full P0
+or Xbox GO decision follows from this reduced test run.
+
+See [P0 handoff](14-p0-handoff.md) for reproduction commands, preserved local
+artifacts and the exact next steps.
 
 ## 5. Console results
 

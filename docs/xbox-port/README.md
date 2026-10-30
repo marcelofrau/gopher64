@@ -17,7 +17,7 @@ Gopher64 is a Rust N64 emulator with a C++ Vulkan renderer (parallel-rdp). Xbox 
 1. **Keep the emulator core untouched.** It is a pure interpreter (no JIT, no `mmap`/`VirtualAlloc`), so it has no UWP-hostile code.
 2. **Compile the Rust crate as a static library** for the Tier-3 target `x86_64-uwp-windows-msvc` (upstream's pinned rustc + `RUSTC_BOOTSTRAP=1` + `-Z build-std`), with `--no-default-features` (drops slint/winit/wgpu/rfd/open).
 3. **Host it in a thin C++20 UWP executable** that uses SDL3-uwp's `SDL_main` (same pattern as our Ymir port) and calls into Rust through a C ABI entry point (modelled on the existing Android `gopher64_sdl_main`).
-4. **Run Vulkan through Mesa Dozen** (Vulkan → D3D12, `vulkan_dzn.dll` from our `mesa-uwp` fork), loaded directly with `LoadPackagedLibrary`, bypassing the Khronos loader. parallel-rdp's hard requirements are small (Vulkan 1.1 + compute); everything else it uses has fallbacks. Dozen-on-Xbox is already proven by shipped projects (OnyxEMU, rpcs3-xbox, gow3_xbox, WWHD-UWP — October 2026); we adopt their Xbox-specific Mesa fixes (write-combined memory, DXIL self-signing, PSO cache).
+4. **Run Vulkan through Mesa Dozen** (Vulkan → D3D12, `vulkan_dzn.dll` from our `mesa-uwp` fork), loaded directly with `LoadPackagedLibrary`, bypassing the Khronos loader. parallel-rdp requires Vulkan 1.1, compute, a swapchain and 8/16-bit storage buffer access ([04 §2](04-vulkan-dozen.md#2-what-parallel-rdp--granite-actually-require)). Dozen-on-Xbox is already proven by shipped projects (OnyxEMU, rpcs3-xbox, gow3_xbox, WWHD-UWP — October 2026); we adopt their Xbox-specific Mesa fixes (write-combined memory, DXIL self-signing, PSO cache).
 5. **Replace the few SDL subsystems that are broken on Xbox**: audio → XAudio2 (SDL WASAPI deadlocks on Xbox), Vulkan surface → custom Granite `WSIPlatform`, paths → LocalState / external drive.
 6. **Package, sign and deploy** with the scripts we already proved on Ymir, dosbox-pure and scummvm.
 7. **De-risk first**: Phase 0 validates parallel-rdp on Dozen **on a Windows PC** before any Xbox work.
@@ -84,7 +84,8 @@ flowchart LR
 | Renderer | parallel-rdp (Vulkan compute) + Granite Vulkan backend + volk | `build.rs:16-82` |
 | Vulkan entry | `Context::init_loader(SDL_Vulkan_GetVkGetInstanceProcAddr())` | `parallel-rdp/interface.cpp:430` |
 | Hard Vulkan needs | Vulkan 1.1, graphics+compute queue, `VK_KHR_swapchain` (+ `create_renderpass2` if < 1.2) | `vulkan/context.cpp:918,1085,1428` |
-| Optional Vulkan needs | timeline semaphores, 8/16-bit storage, subgroups, `VK_EXT_external_memory_host` | `rdp_device.cpp:75-111`, `rdp_renderer.cpp:200-250`, `device.cpp:1066` |
+| Required Vulkan storage | 8/16-bit storage buffer access; 8/16-bit arithmetic is optional | `rdp_renderer.cpp:168-177,213-225` |
+| Optional Vulkan needs | timeline semaphores, subgroups, `VK_EXT_external_memory_host` | `rdp_device.cpp:75-111`, `rdp_renderer.cpp:228-250`, `device.cpp:1066` |
 | Dozen | Vulkan 1.2, timeline ✔, subgroups ✔ (if WaveOps), 16-bit ✔ (if native 16-bit), 8-bit off by default, ext-mem-host only with `ID3D12Device13` | `mesa-uwp/src/microsoft/vulkan/dzn_device.c:61-149,668-800,986` |
 | Dozen UWP WSI | `VK_KHR_win32_surface` → `CreateSwapChainForCoreWindow`, extent from HDMI mode | `mesa-uwp/src/vulkan/wsi/wsi_common_win32.cpp:210,925` |
 | Dozen DLL exports | `vk_icdGetInstanceProcAddr`, `vk_icdGetPhysicalDeviceProcAddr`, `vk_icdNegotiateLoaderICDInterfaceVersion`; App CRT | `dumpbin` of RetroArch's bundled `vulkan_dzn.dll` |
