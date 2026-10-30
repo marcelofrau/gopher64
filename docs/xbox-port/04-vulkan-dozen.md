@@ -265,8 +265,9 @@ Logged to `{root}\logs\gopher64.log` after device creation:
 Dozen 26.2.4, required 8-bit storage enabled, `ALLOW_EXTERNAL_HOST=0`,
 `SINGLE_THREADED_COMMAND=1` and `UBERSHADER=1` set before launch. The default
 split renderer was corrupted. Ubershader passed 237 reduced RDP suites on NVIDIA,
-but Intel gameplay remained corrupted. Root cause and performance are unverified;
-see [checkpoint and reproduction](14-p0-handoff.md).
+but Intel gameplay remained corrupted. Follow-up tests matched native speed in all
+four reference games and validated SM64 at 2×/4×; root cause remains unresolved.
+See [checkpoint and reproduction](14-p0-handoff.md).
 
 The renderer's basic Dozen compatibility can be tested on a desktop: the desktop build already loads Vulkan through `SDL_Vulkan_LoadLibrary` → `vulkan-1.dll` (the Khronos loader), which honours `VK_DRIVER_FILES`. This does not retire the Xbox-specific risks listed below.
 

@@ -57,7 +57,13 @@
 
 <a id="p0-results"></a>
 
-Fill in during P0.
+**2026-10-30 matrix result:** all four reference games rendered correctly in the
+user's short desktop tests on NVIDIA with Dozen 26.2.4 + ubershader + 8-bit storage
+enabled + external host import disabled + single-threaded commands. Reported
+speed matched native. SM64 passed at 1×/2×/4×; MK64, OoT and GoldenEye passed
+save/load round trips. Recommendation: scoped GO for P1 with this fallback.
+Coherent Dozen mode, Intel correctness and Xbox behavior remain unresolved;
+this is not completion of the original coherent-and-incoherent exit criterion.
 
 2026-10-30 preliminary setup: the prebuilt [mmozeiko/build-mesa 26.2.6](https://github.com/mmozeiko/build-mesa/releases/tag/26.2.6) `mesa-dzn-x64` archive passed its published SHA-256 check. With `VK_DRIVER_FILES` set to its manifest, `vulkaninfo --summary` reported Dozen 26.2.6 for NVIDIA RTX 3500 Ada, Intel Arc and Microsoft Basic Render Driver. The NVIDIA device exposes `VK_EXT_external_memory_host`; actual coherent-mode use remains to be verified in the renderer. No game result is implied by this setup check.
 
@@ -65,8 +71,10 @@ Fill in during P0.
 |------|-----------------|-------------|------|------|--------|-------|-------|
 | 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | n/a | native Vulkan (baseline) | SM64 | User reports image and audio working | not measured | portable data directory |
 | 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | n/a | native Vulkan, `ALLOW_EXTERNAL_HOST=0` | SM64 | User reports correct rendering, no visible faults | not measured | Control for the incoherent RDRAM path; normal exit |
-| | | | Dozen, coherent | SM64 | | | |
-| | | | Dozen, `ALLOW_EXTERNAL_HOST=0` | SM64 | | | |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | n/a | native Vulkan, external host disabled, single-threaded commands, `BENCH=1` | SM64 | Correct rendering; castle courtyard screenshot | Opening 20 FPS, menu/courtyard 30 FPS; 60 VI/s throughout (user observed) | Full-speed reference; native state saved for Dozen comparison |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Dozen, 1×, 8-bit storage on, external host disabled, single-threaded commands, ubershader, `BENCH=1` | SM64 | Native savestate loaded with F7; image remains correct | 30 FPS / 60 VI/s sustained; brief 29/59 then 31/61 (user observed) | Normal exit; no sustained slowdown observed in courtyard |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Same working Dozen configuration, 2× upscale | SM64 | User confirms perfect rendering | Stable 30 FPS / 60 VI/s (user observed) | Normal exit; log `out/p0-performance/dozen-2x-20261030-111307-stderr.log` |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Same working Dozen configuration, 4× upscale | SM64 | User confirms perfect rendering | Stable 30 FPS / 60 VI/s (user observed) | Normal exit; log `out/p0-performance/dozen-4x-20261030-111354-stderr.log` |
 | 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled, `SUBGROUP=0` | SM64 | Severe visual corruption persists | not measured | User screenshots |
 | 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | Mesa Dozen 26.2.6 | Dozen, default 8-bit off | SM64 | Fails to initialise: 8-bit storage required | n/a | `storageBuffer8BitAccess` is mandatory |
 | 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | Mesa Dozen 26.2.6 | Dozen, 8-bit on, external host disabled | SM64 | Access violation during startup | n/a | Also fails with 26.2.4 `dxil.dll` directory on PATH; no visual result |
@@ -76,14 +84,41 @@ Fill in during P0.
 | 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled, `SINGLE_THREADED_COMMAND=1`, `UBERSHADER=1` | SM64 | User confirms perfect rendering | not measured | Normal exit (0); first visually successful Dozen configuration |
 | 2026-10-30 | Intel Arc Pro / 101.8860 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled | SM64 | Visual corruption persists | not measured | User reports improved 3D but worse 2D; screenshots |
 | 2026-10-30 | Intel Arc Pro / 101.8860 | mesa-dist-win 26.2.4 | Dozen, 8-bit on, external host disabled, `UBERSHADER=1` | SM64 | Visual corruption persists | not measured | User reports similar result to previous Intel test |
-| | | | … | MK64 / OoT / GE | | | |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | n/a | Native Vulkan, 1×, external host disabled, single-threaded commands, `BENCH=1` | MK64 | User confirms correct image/audio and save/load round trip | Stable 30 FPS / 60 VI/s (user observed) | Normal exit; log `out/p0-performance/mk64-native-20261030-111719-stderr.log` |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Working Dozen configuration, 1×, `BENCH=1` | MK64 | User confirms correct image/audio, native state load and new Dozen save/load round trip | Stable 30 FPS / 60 VI/s (user confirmed) | Normal exit; log `out/p0-performance/mk64-dozen-20261030-111835-stderr.log` |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | n/a | Native Vulkan, 1×, external host disabled, single-threaded commands, `BENCH=1` | OoT (U, V1.2) | User confirms correct image/audio and save/load round trip | 20 FPS / 60 VI/s (user observed) | Normal exit; log `out/p0-performance/oot-native-20261030-111921-stderr.log` |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Working Dozen configuration, 1×, `BENCH=1` | OoT (U, V1.2) | User confirms same correct image/audio and new save/load round trip | 20 FPS / 60 VI/s (user confirmed) | Normal exit; log `out/p0-performance/oot-dozen-20261030-112131-stderr.log` |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | n/a | Native Vulkan, 1×, external host disabled, single-threaded commands, `BENCH=1` | GoldenEye (U) | User reports good rendering; savestate file present | 23–32 FPS; VI/s almost always 60 (user observed) | Normal exit; log `out/p0-performance/ge-native-20261030-112315-stderr.log` |
+| 2026-10-30 | NVIDIA RTX 3500 Ada / 596.72 | mesa-dist-win 26.2.4 | Working Dozen configuration, 1×, `BENCH=1` | GoldenEye (U) | User confirms same result as native, including image/audio and requested save/load check | Same reported 23–32 FPS range; VI/s almost always 60 | Normal exit; log `out/p0-performance/ge-dozen-20261030-112527-stderr.log` |
 
-Feature dump (paste from log):
+### Working driver feature dump
+
+Source: `out/p0-performance/vulkaninfo-dozen-26.2.4-8bit.txt`, GPU0;
+captured with the working manifest and `dzn_enable_8bit_loads_stores=true`.
+These are advertised capabilities, not proof every renderer path used them.
 
 ```text
-(device name, apiVersion, driverID, subgroupSize, ops, int16/int8, 8/16-bit storage,
- timeline, ext-mem-host, memory heaps, parallel-rdp caps chosen)
+deviceName: Microsoft Direct3D12 (NVIDIA RTX 3500 Ada Generation Laptop GPU)
+apiVersion: 1.2.354; deviceType: DISCRETE_GPU
+driverID: MESA_DOZEN; driverInfo: Mesa 26.2.4 (git-9a0169f2a7)
+subgroupSize: 32; supported stages include COMPUTE
+subgroup operations: BASIC, VOTE, ARITHMETIC, BALLOT, SHUFFLE, SHUFFLE_RELATIVE, QUAD
+shaderInt16 / shaderInt8: true / true
+storageBuffer16BitAccess / storageBuffer8BitAccess: true / true
+timelineSemaphore: true
+VK_EXT_external_memory_host: advertised; minImportedHostPointerAlignment: 65536
+heap 0: 17.93 GiB, non-device-local; heap 1: 11.73 GiB, device-local
+type 0: heap 0, flags none
+type 1: heap 0, HOST_VISIBLE | HOST_COHERENT
+type 2: heap 0, HOST_VISIBLE | HOST_COHERENT | HOST_CACHED
+type 3: heap 1, DEVICE_LOCAL
 ```
+
+Renderer logs confirm: incoherent RDRAM fallback, small integer arithmetic enabled,
+ubershader enabled and single-threaded command processing. Swapchain: 640×480,
+format enum 44 (B8G8R8A8_UNORM), present mode enum 1 (MAILBOX), two images.
+The exact selected subgroup tile-binning/depth-blend flags were not logged;
+do not infer them from device capabilities. Budgets/heaps are desktop measurements.
 
 ### P0 automated renderer investigation (2026-10-30)
 
@@ -112,8 +147,20 @@ passes these tests. This does **not** yet identify the faulty compiler pass or
 barrier: ubershader changes both shader specialization and the dispatch structure.
 The user confirmed perfect SM64 rendering with NVIDIA + ubershader in gopher64;
 the process exited normally. Intel already showed corruption with ubershader.
-Performance, other games, savestates and upscaling remain unverified. No full P0
-or Xbox GO decision follows from this reduced test run.
+The subsequent 1× courtyard comparison sustained 30 FPS / 60 VI/s on both native
+and Dozen; loading the native savestate on Dozen preserved correct rendering.
+Follow-up 2× and 4× tests also rendered correctly at 30 FPS / 60 VI/s in SM64.
+MK64, OoT and GoldenEye subsequently matched their native baselines and passed
+user-observed Dozen save/load checks. This supports a scoped P1 GO recommendation,
+not an Xbox correctness/performance claim or a bit-exact savestate comparison.
+
+Performance logs are in local `out/p0-performance/`: native run
+`20261030-110801` and Dozen run `20261030-111036`. Whole-session GPU timestamp
+averages for `render-pass` were 0.721 and 9.486 ms/frame-context respectively.
+These are not total frame times or a scene-controlled benchmark; the sessions
+include startup and different dwell times. Dozen costs more GPU time but did not
+show sustained emulation slowdown in the observed scene. The native savestate
+was backed up in `native-states-20261030-111036/` before loading it on Dozen.
 
 See [P0 handoff](14-p0-handoff.md) for reproduction commands, preserved local
 artifacts and the exact next steps.

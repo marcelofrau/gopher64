@@ -42,27 +42,35 @@ flowchart LR
 
 **Goal:** prove the renderer logic works on Dozen before investing in UWP. No code changes in gopher64.
 
-**2026-10-30 checkpoint:** desktop build and native SM64 succeeded; SM64 renders
-correctly on Dozen 26.2.4 / NVIDIA with `UBERSHADER=1`, required 8-bit storage,
-external host import disabled and single-threaded commands. All 237 RDP suites
-passed a reduced run with that configuration. P0 remains open: see
+**2026-10-30 checkpoint (`uwp-v0.0.2`):** all four games matched native in short
+user-observed tests on Dozen 26.2.4 / NVIDIA with `UBERSHADER=1`, required 8-bit
+storage, external host import disabled and single-threaded commands. SM64 passed
+1×/2×/4× at 30 FPS / 60 VI/s; savestate round trips passed in MK64/OoT/GoldenEye.
+All 237 RDP suites passed a reduced run. Recommendation: scoped GO to P1;
+coherent mode and exact renderer subgroup diagnostics remain open. See
 [handoff and next steps](14-p0-handoff.md) and [results](13-testing-debugging.md#p0-results).
 
 - [x] Create branch `uwp/main` from `main` (D-16); commit `docs/xbox-port/` (`1d0394a`)
 - [x] `git submodule update --init --recursive` (all pinned submodules initialised)
-- [ ] Build desktop gopher64 as upstream does (`cargo build --release`) and run SM64 on the native driver (baseline screenshots + FPS)
+- [x] Build desktop gopher64 as upstream does (`cargo build --release`) and run SM64 on the native driver (user courtyard screenshot: 30 FPS / 60 VI/s)
 - [x] Install the Vulkan SDK (for `vulkaninfo`) or use `vulkaninfo` from the GPU driver package
 - [x] Obtain desktop Dozen: build `mesa-uwp` **without** `--uwp` (desktop target) with meson-uwp, or use a prebuilt desktop release; keep `vulkan_dzn.dll` + `dzn_icd.x86_64.json`
 - [x] `VK_DRIVER_FILES=…\dzn_icd.x86_64.json vulkaninfo --summary` shows only `Microsoft Direct3D12 (…)`, `driverID = MESA_DOZEN`
-- [ ] Run gopher64 on Dozen: SM64, MK64, Zelda OoT, GoldenEye (title screen + 2 min gameplay each); compare with baseline
-- [ ] Repeat with `PARALLEL_RDP_ALLOW_EXTERNAL_HOST=0` (Xbox-like incoherent RDRAM)
-- [ ] Enable `dzn_enable_8bit_loads_stores=true` (required); repeat with `PARALLEL_RDP_SUBGROUP=0`
-- [ ] Test save state → load state round trip on Dozen (exercises TMEM/hidden RDRAM `memcpy`)
-- [ ] Test upscale 2× and 4×
-- [ ] Capture the feature dump ([04 §6](04-vulkan-dozen.md#6-startup-diagnostics-to-log-always-on-every-boot)) — add a temporary log patch if needed
-- [ ] Record results in [13 §4](13-testing-debugging.md#p0-results)
+- [x] Run gopher64 on Dozen: SM64, MK64, Zelda OoT, GoldenEye; compare with baseline (short manual gameplay, requested 2 min; duration not timed)
+- [x] Repeat with `PARALLEL_RDP_ALLOW_EXTERNAL_HOST=0` (all four working runs used this Xbox-like incoherent RDRAM path)
+- [x] Enable `dzn_enable_8bit_loads_stores=true` (required); repeat with `PARALLEL_RDP_SUBGROUP=0` (SM64 triage remained corrupted; accepted working configuration uses ubershader)
+- [x] Test save state → load state round trip on Dozen (MK64: user confirmed new F5 → F7 restores correctly; visual check, not bit-exact frame comparison)
+- [x] Test upscale 2× and 4× (SM64 / NVIDIA / Dozen 26.2.4 ubershader: correct image, 30 FPS / 60 VI/s at both scales)
+- [x] Capture driver feature dump and available renderer logs ([13 §4](13-testing-debugging.md#p0-results))
+- [ ] Capture exact selected renderer subgroup caps (not exposed by current logs)
+- [x] Record results in [13 §4](13-testing-debugging.md#p0-results)
 
 **Exit criteria:** all four games render identically (visually) to the native driver in coherent and incoherent modes, ≥ 100 % speed on the PC. → **GO**. Otherwise follow [04 §7](04-vulkan-dozen.md#7-p0--validating-dozen-on-a-windows-pc-before-any-xbox-work) triage and [09 §3](09-risks.md#3-kill-criteria-summary).
+
+**Scope exception proposed for P1:** coherent Dozen import failed despite advertised
+support. The tested path is the incoherent fallback expected on Xbox, with
+ubershader required. Results justify toolchain bring-up, but do not claim the
+original two-mode criterion passed. Intel and Xbox validation remain separate.
 
 ---
 
