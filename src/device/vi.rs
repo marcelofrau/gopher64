@@ -220,7 +220,12 @@ fn speed_limiter(device: &mut device::Device) {
         Some(deadline) => {
             if now < deadline {
                 let dur = deadline - now;
+                // UWP-PORT: spin_sleep imports winmm (timeBeginPeriod), which is not in the
+                // UWP API partition; use a local high-resolution-timer sleep instead. (D-14)
+                #[cfg(not(target_vendor = "uwp"))]
                 spin_sleep::sleep(dur);
+                #[cfg(target_vendor = "uwp")]
+                crate::ui::uwp::time::precise_sleep(dur);
 
                 if dur < device.ui.speed_limiter.min_wait_time {
                     device.ui.speed_limiter.min_wait_time = dur;

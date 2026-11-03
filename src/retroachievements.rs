@@ -1,7 +1,14 @@
+// UWP-PORT: get_rich_presence and its ra_get_rich_presence binding are only consumed by the
+// Discord task, which is a no-op on UWP (D-09). Allow the resulting dead_code on UWP only.
+#![cfg_attr(target_vendor = "uwp", allow(dead_code))]
 include!(concat!(env!("OUT_DIR"), "/retroachievements_bindings.rs"));
 
 use crate::ui;
 
+// UWP-PORT: Discord rich presence uses a named pipe to the desktop Discord client, which
+// does not exist on Xbox. The crate is gated out of the UWP graph (D-09); init_rich_presence
+// below has a no-op UWP variant. rich_presence config stays but is never enabled on UWP.
+#[cfg(not(target_vendor = "uwp"))]
 use discord_rich_presence::DiscordIpc;
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
@@ -286,6 +293,18 @@ pub fn load_state(state: *const u8, state_size: usize) {
     unsafe { ra_load_state(state, state_size) };
 }
 
+// UWP-PORT: no Discord on Xbox — a no-op task keeps the signature. Never called on UWP
+// (load_game only calls this when discord_rich_presence is true, which it never is). (D-09)
+#[cfg(target_vendor = "uwp")]
+pub fn init_rich_presence(
+    _discord_watch_rx: tokio::sync::watch::Receiver<()>,
+    _game_title: String,
+    _game_image_url: String,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {})
+}
+
+#[cfg(not(target_vendor = "uwp"))]
 pub fn init_rich_presence(
     mut discord_watch_rx: tokio::sync::watch::Receiver<()>,
     game_title: String,

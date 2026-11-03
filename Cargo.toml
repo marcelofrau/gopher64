@@ -56,6 +56,9 @@ sdl3-sys = { version = "0.7", features = ["assert-level-release"] }
 sdl3-ttf-sys = { version = "0.7", features = ["no-sdlttf-harfbuzz", "no-sdlttf-plutosvg"] }
 webpki-roots = "1.0"
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "charset", "http2", "json", "query"] }
+# On desktop/Android the ring provider is pulled in transitively; enable it explicitly on
+# UWP so rustls::crypto::ring (ui.rs install_default_crypto_provider) resolves.
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 # UWP-PORT: desktop-only deps gated out of UWP (slint GUI, file dialogs, dirs).
 [target.'cfg(not(any(target_os = "android", target_vendor = "uwp")))'.dependencies]

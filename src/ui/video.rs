@@ -1,5 +1,9 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
+// UWP-PORT: some generated parallel-rdp bindings (e.g. MESSAGE_LENGTH_MESSAGE_LONG) are only
+// used by the real netplay module, which is stubbed out on UWP (D-09). Allow the resulting
+// dead_code on UWP only, rather than annotating generated code. (D-14)
+#![cfg_attr(target_vendor = "uwp", allow(dead_code))]
 include!(concat!(env!("OUT_DIR"), "/parallel_bindings.rs"));
 use crate::{device, netplay, retroachievements, ui};
 

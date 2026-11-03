@@ -135,23 +135,28 @@ The repo must build and work the same on any machine with the workspace layout `
 
 ## Hook inventory (planned — update as hooks land)
 
-| Upstream file | Hook | Decision | Approx. lines |
-|---------------|------|----------|---------------|
-| `Cargo.toml` | Target-specific dependency tables | D-05, D-09, D-11, D-15 | ~40 |
-| `.cargo/config.toml` | `[target.x86_64-uwp-windows-msvc]` section + target CC vars (appended at end) | D-03, D-14 | ~10 |
-| `build.rs` | One `if uwp { … }` block: defines, no `-flto`, no winresource, `/FI` header | D-14 | ~20 |
-| `src/lib.rs` | `#[cfg(target_vendor = "uwp")] mod` line for the UWP entry module | D-02 | ~2 |
-| `src/ui.rs` | `mod uwp` line; `get_dirs()` delegation; `WEB_CLIENT` cfg widened to `any(android, uwp)`; extra hints | D-10, D-11, D-04 | ~15 |
-| `src/ui/audio.rs` | Delegation to `ui::uwp::audio` per public fn | D-08 | ~25 |
-| `src/ui/video.rs` | Window flags on UWP | D-04, D-07 | ~6 |
-| `src/device/vi.rs` | `cfg`-gated call to `ui::uwp::time::precise_sleep` next to the untouched `spin_sleep::sleep` | 05 §4 | ~3 |
-| `src/main.rs` | none (desktop only) | — | 0 |
-| `src/netplay.rs`, `src/ui/netplay.rs` | `cfg` swap to stub module | D-09 | ~6 |
-| `src/retroachievements.rs` | Discord calls gated | D-09 | ~8 |
-| `src/ui/usb.rs` | Gated | D-09 | ~3 |
-| `parallel-rdp/interface.cpp` | Dozen loader `#ifdef`; suspend-teardown guard | D-07, D-18 | ~20 |
-| `parallel-rdp/wsi_platform.cpp` | UWP surface `#ifdef` | D-07 | ~25 |
-| **Total** | **~14 files** | | **~180–250** |
+Status: ✔ landed (P1 blocks 1–6) · ○ planned (P1 block 8 / P2+).
+
+| Upstream file | Hook | Decision | Lines | Status |
+|---------------|------|----------|-------|--------|
+| `Cargo.toml` | Target-specific dependency tables (+ `rustls`/`ring` and `sdl3-sys`/`assert-level-release` in the UWP table only) | D-05, D-09, D-11, D-15 | ~39 | ✔ |
+| `.cargo/config.toml` | `[target.x86_64-uwp-windows-msvc]` section + target CC vars (appended at end) | D-05, D-14 | ~10 | ✔ |
+| `build.rs` | `if uwp { … }` blocks: defines + `/FI` header on the C/C++ builds, skip `-flto`, skip winresource | D-14 | ~32 | ✔ |
+| `src/lib.rs` | `cfg` swap of `mod netplay` to the stub via `#[path]` (block 8 will add the UWP entry module) | D-09, D-02 | ~7 | ✔ |
+| `src/ui.rs` | `mod uwp` line; `get_dirs()` UWP delegation; `WEB_CLIENT` cfg widened | D-10, D-11, D-04 | ~10 | ✔ |
+| `src/ui/audio.rs` | none needed — SDL3 audio compiles on UWP as-is (block 7 dropped) | D-08 | 0 | ✔ |
+| `src/ui/video.rs` | inner `cfg_attr(uwp, allow(dead_code))` for netplay-only generated bindings (window flags: P2+) | D-14, D-09 | ~4 | ✔ |
+| `src/device/vi.rs` | `cfg`-gated call to `ui::uwp::time::precise_sleep` next to the untouched `spin_sleep::sleep` | 05 §4 | ~5 | ✔ |
+| `src/main.rs` | none (desktop only) | — | 0 | — |
+| `src/netplay.rs` | `cfg(not(uwp))` on `mod netplay` in lib.rs; stub in `src/ui/uwp/netplay_stub.rs` | D-09 | — | ✔ |
+| `src/ui/netplay.rs` | none — already `cfg(feature = "gui")`, excluded by `--no-default-features` | D-09 | 0 | ✔ |
+| `src/retroachievements.rs` | Discord `use`/`init_rich_presence` gated + no-op; inner `cfg_attr(uwp, allow(dead_code))` for the Discord-only binding | D-09 | ~19 | ✔ |
+| `src/ui/usb.rs` | Gated | D-09 | ~3 | ○ |
+| `parallel-rdp/interface.cpp` | Dozen loader `#ifdef`; suspend-teardown guard | D-07, D-18 | ~20 | ○ |
+| `parallel-rdp/wsi_platform.cpp` | UWP surface `#ifdef` | D-07 | ~25 | ○ |
+| **Total (landed, P1 b1–6)** | **8 upstream files** | | **~130** | |
+
+Port-owned files added: `scripts/uwp/build-deps.ps1`, `scripts/uwp/gen-links.ps1`, `uwp/compat/g64_uwp_compat.h`, `src/ui/uwp/{mod,time,netplay_stub}.rs`.
 
 ## PR / commit checklist for `uwp/main`
 

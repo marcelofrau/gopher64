@@ -2,6 +2,13 @@
 
 mod cheats;
 mod device;
+// UWP-PORT: netplay pulls in ggrs + matchbox_socket (WebRTC), which are gated out of the
+// UWP crate graph (D-09). Swap in a stub with the identical public API so the hot-path
+// call sites (device.rs, savestates.rs, controller.rs, storage.rs, vi.rs) compile unchanged.
+#[cfg(not(target_vendor = "uwp"))]
+mod netplay;
+#[cfg(target_vendor = "uwp")]
+#[path = "ui/uwp/netplay_stub.rs"]
 mod netplay;
 mod retroachievements;
 mod savestates;

@@ -14,6 +14,9 @@ pub mod netplay;
 pub mod retroachievements;
 pub mod storage;
 pub mod usb;
+// UWP-PORT: port-owned UWP helpers (high-resolution timer sleep, etc.). (D-14)
+#[cfg(target_vendor = "uwp")]
+pub mod uwp;
 pub mod video;
 #[cfg(all(feature = "gui", not(target_os = "android")))]
 pub mod vru;
@@ -211,7 +214,12 @@ pub fn get_dirs() -> Dirs {
     #[cfg(target_os = "android")]
     return android::get_dirs();
 
-    #[cfg(not(target_os = "android"))]
+    // UWP-PORT: no `dirs` crate (SHGetKnownFolderPath/shell32) on UWP. Storage lives under a
+    // single root injected by the host (external drive or LocalState, D-10). (D-10)
+    #[cfg(target_vendor = "uwp")]
+    return uwp::get_dirs();
+
+    #[cfg(not(any(target_os = "android", target_vendor = "uwp")))]
     {
         let exe_path = std::env::current_exe().unwrap();
         let portable_dir = exe_path.parent();
