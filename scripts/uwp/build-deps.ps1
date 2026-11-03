@@ -38,11 +38,20 @@ New-Item -ItemType Directory -Force -Path $out, $work | Out-Null
 $cmake = (Get-Command cmake -ErrorAction Stop).Source
 Write-Host "cmake: $cmake"
 
+# WindowsStore (UWP) builds require the Visual Studio generator (Ninja rejects -A/platform
+# specs and the WinRT toolchain). Pick the newest installed VS generator dynamically so no
+# VS version is hard-coded.
+$vsGen = (& $cmake --help | Select-String -Pattern '^\s+(Visual Studio \d+ \d+)' |
+    ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -First 1)
+if (-not $vsGen) { throw "No Visual Studio CMake generator found (needed for WindowsStore)." }
+Write-Host "generator: $vsGen"
+
 # WindowsStore build args shared by SDL3 and SDL_ttf.
 $storeArgs = @(
+    "-G", $vsGen,
+    "-A", "x64",
     "-DCMAKE_SYSTEM_NAME=WindowsStore",
     "-DCMAKE_SYSTEM_VERSION=10.0",
-    "-A", "x64",
     "-DBUILD_SHARED_LIBS=ON"
 )
 
@@ -68,7 +77,8 @@ if (-not (Test-Path $ttfSrc)) {
     if ($LASTEXITCODE) { throw "git clone SDL_ttf failed" }
 }
 Write-Host "==> Building SDL_ttf (WindowsStore DLL, against out/uwp-deps SDL3)"
-Invoke-CMakeBuild $ttfSrc (Join-Path $work "SDL_ttf") @(
+# Build dir MUST differ from the source tree ($ttfSrc) — freetype refuses in-source builds.
+Invoke-CMakeBuild $ttfSrc (Join-Path $work "SDL_ttf-build") @(
     "-DSDL3_DIR=$($out -replace '\\','/')/cmake",
     "-DSDLTTF_VENDORED=ON",
     "-DSDLTTF_HARFBUZZ=OFF", "-DSDLTTF_PLUTOSVG=OFF",

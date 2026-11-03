@@ -133,14 +133,34 @@ fn main() {
     simd_build.flag(opt_flag);
     retroachievements_build.flag(opt_flag);
 
+    // UWP-PORT: compile the C/C++ (volk, parallel-rdp, rcheevos) under WINAPI_FAMILY_APP
+    // with clang-cl, force-including the compat header, and without LTO bitcode (the host
+    // links the staticlib, not rust-lld). See docs/xbox-port/05 §7. (D-14)
+    let uwp = std::env::var("CARGO_CFG_TARGET_VENDOR").unwrap_or_default() == "uwp";
+    if uwp {
+        for b in [
+            &mut volk_build,
+            &mut rdp_build,
+            &mut retroachievements_build,
+        ] {
+            b.define("GOPHER64_UWP", None);
+            b.define("WINAPI_FAMILY", "WINAPI_FAMILY_APP");
+            b.define("_XBOX_UWP", None);
+            b.flag("/FIuwp/compat/g64_uwp_compat.h");
+        }
+    }
+
     if os == "windows" {
         volk_build.flag("-DVK_USE_PLATFORM_WIN32_KHR");
         rdp_build.flag("-DVK_USE_PLATFORM_WIN32_KHR");
 
-        winresource::WindowsResource::new()
-            .set_icon("data/icon/icon.ico")
-            .compile()
-            .unwrap();
+        // UWP-PORT: the .rc icon is irrelevant in an appx and winresource needs rc.exe. (D-14)
+        if !uwp {
+            winresource::WindowsResource::new()
+                .set_icon("data/icon/icon.ico")
+                .compile()
+                .unwrap();
+        }
     } else if os == "macos" {
         let output = std::process::Command::new("clang")
             .args(["--print-runtime-dir"])
@@ -153,10 +173,14 @@ fn main() {
         println!("cargo:rustc-link-lib=static=clang_rt.osx");
     }
 
-    volk_build.flag("-flto=thin");
-    rdp_build.flag("-flto=thin");
-    simd_build.flag("-flto=thin");
-    retroachievements_build.flag("-flto=thin");
+    // UWP-PORT: -flto=thin emits bitcode that only the rust-lld/desktop link understands;
+    // the UWP staticlib is linked by the C++ host, so skip it there. (D-14)
+    if !uwp {
+        volk_build.flag("-flto=thin");
+        rdp_build.flag("-flto=thin");
+        simd_build.flag("-flto=thin");
+        retroachievements_build.flag("-flto=thin");
+    }
 
     volk_build.compile("volk");
     rdp_build.compile("parallel-rdp");
