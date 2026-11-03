@@ -1,4 +1,5 @@
 // UWP-PORT: port-owned helpers used only on the UWP (Xbox) target. (D-14)
+pub mod entry;
 pub mod time;
 
 use std::path::PathBuf;
@@ -8,9 +9,7 @@ use std::sync::RwLock;
 // executable's directory so a PC sideload still works.
 static ROOT: RwLock<Option<PathBuf>> = RwLock::new(None);
 
-/// Set the storage root. Called by the host shim (gopher64_uwp_set_root) at startup.
-/// Wired up in P1 lib.rs (Block 8); allow dead_code until then.
-#[allow(dead_code)]
+/// Set the storage root. Called by the host shim via gopher64_uwp_set_root (entry.rs).
 pub fn set_root(root: PathBuf) {
     *ROOT.write().unwrap() = Some(root);
 }
