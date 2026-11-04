@@ -197,11 +197,28 @@ fn swap_rom(contents: Vec<u8>) -> Option<Vec<u8>> {
 
 pub fn get_rom_contents(file_path: &std::path::PathBuf) -> Option<Vec<u8>> {
     let mut contents = vec![];
-    if file_path
-        .extension()
-        .unwrap_or_default()
-        .eq_ignore_ascii_case("zip")
+    let extension = file_path.extension().unwrap_or_default();
+    #[cfg(any(target_vendor = "uwp", all(test, not(target_os = "android"))))]
+    let extension = if file_path
+        .file_name()
+        .is_some_and(|name| name == "gopher64-staged.rom")
     {
+        let mut header = [0; 6];
+        std::fs::File::open(file_path)
+            .ok()?
+            .read_exact(&mut header)
+            .ok()?;
+        if matches!(&header[..4], b"PK\x03\x04" | b"PK\x05\x06" | b"PK\x07\x08") {
+            std::ffi::OsStr::new("zip")
+        } else if header == *b"7z\xbc\xaf\x27\x1c" {
+            std::ffi::OsStr::new("7z")
+        } else {
+            extension
+        }
+    } else {
+        extension
+    };
+    if extension.eq_ignore_ascii_case("zip") {
         #[cfg(target_os = "android")]
         let zip_file = ui::android::get_file_from_uri(file_path)?;
         #[cfg(not(target_os = "android"))]
@@ -219,11 +236,7 @@ pub fn get_rom_contents(file_path: &std::path::PathBuf) -> Option<Vec<u8>> {
                 break;
             }
         }
-    } else if file_path
-        .extension()
-        .unwrap_or_default()
-        .eq_ignore_ascii_case("7z")
-    {
+    } else if extension.eq_ignore_ascii_case("7z") {
         #[cfg(target_os = "android")]
         let sevenz_file = ui::android::get_file_from_uri(file_path)?;
         #[cfg(not(target_os = "android"))]
@@ -320,6 +333,48 @@ mod rom_loading_tests {
             .unwrap();
         let archived = TempFile::new("7z", &seven.finish().unwrap().into_inner());
         assert_eq!(get_rom_contents(&archived.0).unwrap(), rom);
+    }
+
+    #[test]
+    fn fixed_staging_file_accepts_raw_zip_and_7z_replacements() {
+        struct StagingDir(std::path::PathBuf);
+        impl Drop for StagingDir {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(self.0.join("gopher64-staged.rom"));
+                let _ = std::fs::remove_dir(&self.0);
+            }
+        }
+
+        let id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = StagingDir(std::env::temp_dir().join(format!("gopher64-staging-{id}")));
+        std::fs::create_dir(&directory.0).unwrap();
+        let path = directory.0.join("gopher64-staged.rom");
+        let mut rom = vec![0; 0x1000];
+        rom[..4].copy_from_slice(&0x80371240u32.to_be_bytes());
+
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        zip.start_file("game.z64", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(&rom).unwrap();
+        let zip = zip.finish().unwrap().into_inner();
+
+        let mut seven = sevenz_rust2::ArchiveWriter::new(Cursor::new(Vec::new())).unwrap();
+        let entry = sevenz_rust2::ArchiveEntry {
+            name: "game.z64".into(),
+            ..Default::default()
+        };
+        seven
+            .push_archive_entry(entry, Some(Cursor::new(&rom)))
+            .unwrap();
+        let seven = seven.finish().unwrap().into_inner();
+
+        for data in [&rom, &zip, &seven] {
+            std::fs::write(&path, data).unwrap();
+            assert_eq!(get_rom_contents(&path).unwrap(), rom);
+        }
     }
 
     #[test]

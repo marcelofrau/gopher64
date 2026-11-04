@@ -222,3 +222,27 @@ settings as a baseline, study working UWP reference implementations, establish p
 SDL/CoreWindow surface integration with logs, and test the earliest verifiable graphics milestone on
 PC before the user chooses whether to deploy and test on Xbox. Do not treat the documentation's
 sketches or desktop P0 as proof of the UWP implementation.
+
+### Single-slot staging and Dozen integration authorized — 2026-11-04
+
+The user explicitly requested one fixed file in LocalState, overwritten on each new selection,
+and authorized continuing with Dozen integration. Direct/brokered ROM access remains later work.
+
+- The host now copies selected files to `LocalState/gopher64-staging/gopher64-staged.rom` using
+  `ReplaceExisting`; it reuses an already-selected staging file rather than copying it over itself.
+  The original selected file is never overwritten. Existing files in the old TempState are not
+  removed. The fixed slot means recent-ROM entries cannot represent a real persistent library.
+- Because the fixed name no longer contains the original extension, the UWP-specific Rust path
+  detects ZIP and 7z signatures for that reserved basename; raw ROM byte-order handling remains
+  unchanged. A unit test overwrites one slot with valid raw, ZIP, and 7z fixtures and checks each.
+- The Debug UWP host and Rust staticlib built and passed module-level import audit. A local isolated
+  WinRT picker loaded a real ROM from this fixed path to the known SDL Vulkan blocker. An attempted
+  second UI-automation run did not complete as intended; do not treat it as a pass. Independently,
+  the same WinRT `StorageFile.CopyAsync(... ReplaceExisting)` API was tested with two real ROMs in
+  a separate scratch directory: each copy matched the source SHA-256, only one destination file
+  remained, and both originals were unchanged. This API test is not Xbox validation.
+- The P3 investigation found a UWP `vulkan_dzn.dll` in the local RetroArch tree. Its embedded
+  version is Mesa 25.3.3 (`f1ef4e6e64`), not the P0's desktop Mesa 26.2.4; it exports the ICD
+  entry points and contains the `dzn_enable_8bit_loads_stores` option. The sibling `mesa-uwp`
+  checkout is 26.2.0. Treat the older DLL only as a diagnostic candidate until actual device
+  features and compatibility are proven; do not claim P0 parity.

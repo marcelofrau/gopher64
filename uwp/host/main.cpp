@@ -107,17 +107,23 @@ void choose_rom(const std::shared_ptr<PickerState>& state) {
         for (auto extension : {L".n64", L".v64", L".z64", L".bin", L".zip", L".7z"}) {
             picker->FileTypeFilter->Append(ref new Platform::String(extension));
         }
-        // shortcut: staged ROMs remain until Windows clears them; use brokered access for the full library.
         concurrency::create_task(picker->PickSingleFileAsync()).then(
             [state](Windows::Storage::StorageFile^ file) -> concurrency::task<Windows::Storage::StorageFile^> {
                 if (!file) return concurrency::task_from_result<Windows::Storage::StorageFile^>(nullptr);
                 {
                     std::lock_guard<std::mutex> lock(state->mutex);
-                    state->progress = "Copying selected ROM to temporary app storage...";
+                    state->progress = "Copying selected ROM to the app staging file...";
                 }
-                auto folder = Windows::Storage::ApplicationData::Current->TemporaryFolder;
-                return concurrency::create_task(file->CopyAsync(
-                    folder, file->Name, Windows::Storage::NameCollisionOption::GenerateUniqueName));
+                auto root = Windows::Storage::ApplicationData::Current->LocalFolder;
+                return concurrency::create_task(root->CreateFolderAsync(
+                    L"gopher64-staging", Windows::Storage::CreationCollisionOption::OpenIfExists)).then(
+                    [file](Windows::Storage::StorageFolder^ folder) -> concurrency::task<Windows::Storage::StorageFile^> {
+                        auto destination = std::filesystem::path(folder->Path->Data()) / L"gopher64-staged.rom";
+                        if (_wcsicmp(file->Path->Data(), destination.c_str()) == 0)
+                            return concurrency::task_from_result(file);
+                        return concurrency::create_task(file->CopyAsync(
+                            folder, L"gopher64-staged.rom", Windows::Storage::NameCollisionOption::ReplaceExisting));
+                    });
             }).then(
             [state](concurrency::task<Windows::Storage::StorageFile^> result) {
                 std::string path;
@@ -331,7 +337,7 @@ int main(int, char**) {
                     else {
                         rom = picker->path;
                         autoboot = true;
-                        status = "ROM copied to temporary app storage; starting.";
+                        status = "ROM copied to local staging; starting.";
                     }
                     log(status);
                 }

@@ -14,9 +14,9 @@ rendering has been verified. This is a development package, not a release.
   instrumented Rust entry/video messages with timestamps to `LocalState/gopher64-host.log` and the
   debugger. This is **not yet capture of every SDL/RDP/native or Rust stderr line**.
 - Without autoboot, the host opens the native WinRT ROM picker at startup and offers retry after
-  cancellation or failure. It copies the selected ROM to app temporary storage before passing its
-  path to Rust; the original is not modified. The staged files and recent-ROM paths are temporary,
-  not a finished library; see `memory-handoff.md` for the limitation and PC test evidence.
+  cancellation or failure. It replaces the fixed `LocalState/gopher64-staging/gopher64-staged.rom`
+  before passing its path to Rust; the original is not modified. This is one staging slot, not a
+  persistent ROM library; an access-token/handle design is future work.
 - An optional UTF-8 `LocalState/autoboot.txt` contains one absolute ROM path. No ROM is packaged.
   The host presents its status screen, tears down its SDL/ImGui resources, calls the existing Rust
   entry synchronously on that thread, and attempts to restore the status screen after return. It
