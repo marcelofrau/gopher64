@@ -188,3 +188,19 @@ did not exercise Dozen at all. The planned P3 work in `04-vulkan-dozen.md` and t
 provide the UWP Dozen ICD, loader, surface/CoreWindow integration, suitable feature flags and
 diagnostics, then verify the actual results; the documented sketches are not implemented or proved.
 No change to the chosen graphics direction was made, and Xbox deployment remains user-operated.
+
+### User PC F5 ROM test — 21:31
+
+The user ran the current Debug build in VS 2026 on Windows and selected **Banjo-Tooie (.v64)**.
+Their log shows the picker opening, the ROM copied to the app's temporary storage, the frontend
+shut down, and Rust entered. At `21:31:55.407`, Rust logged `creating SDL Vulkan game window`
+and immediately reported `Vulkan support is either not configured in SDL or not available in
+current SDL video driver (winrt) or platform`. It shut down services, returned `1`, and the host
+restored and presented the status screen. This verifies selected-ROM reading and error recovery in
+this PC run, not `rdp_init`, Dozen, gameplay, or Xbox behavior.
+
+The debugger also emitted Windows Gaming Input HRESULTs `8685C003` and `80070057` and Game Bar
+`80004005`; the log does not establish their cause or gameplay impact. Windhawk modules were loaded
+into this PC process; no causal connection to the observed Vulkan failure has been established.
+SDL3 DLLs are Release builds without symbols, as intended by the corrected Store CRT build workflow.
+The next graphics work remains the planned Dozen/P3 integration, subject to the user's direction.
