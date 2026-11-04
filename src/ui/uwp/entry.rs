@@ -31,6 +31,17 @@ pub extern "C" fn gopher64_uwp_set_log_callback(callback: Option<LogCallback>) {
         .unwrap_or_else(|error| error.into_inner()) = callback;
 }
 
+/// UWP-PORT: Forward native renderer diagnostics to the host's timestamped log.
+///
+/// # Safety
+/// A non-null `message` must be a valid NUL-terminated string for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gopher64_uwp_log_native(message: *const std::ffi::c_char) {
+    if !message.is_null() {
+        log(&unsafe { std::ffi::CStr::from_ptr(message) }.to_string_lossy());
+    }
+}
+
 fn argv_to_strings(argc: c_int, argv: *mut *mut c_char) -> Vec<String> {
     if argc <= 0 || argv.is_null() {
         return Vec::new();

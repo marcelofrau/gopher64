@@ -2,6 +2,27 @@ function Test-UwpDebugCrtImport([string]$Module) {
     return $Module -match '^(vccorlib|msvcp|vcruntime|concrt|vcomp)[0-9_]*d(_app)?\.dll$|^ucrtbased\.dll$'
 }
 
+function Test-UwpAllowedAdvapiImports([string[]]$Lines) {
+    $inside = $false
+    $symbols = @()
+    foreach ($line in $Lines) {
+        if ($line -match '^\s{4}([A-Za-z0-9_.-]+\.dll)\s*$') {
+            $inside = $Matches[1] -ieq 'advapi32.dll'
+        } elseif ($line -match '^\s*Summary\s*$') {
+            $inside = $false
+        } elseif ($inside -and $line -match '^\s*Ordinal\s+\d+\s*$') {
+            return $false
+        } elseif ($inside -and $line -match '^\s+[0-9A-Fa-f]+\s+(\S+)\s*$') {
+            $symbols += $Matches[1]
+        }
+    }
+    if ($symbols.Count -eq 0) { return $false }
+    foreach ($symbol in $symbols) {
+        if ($symbol -cnotin @('EventRegister', 'EventUnregister', 'EventWriteTransfer')) { return $false }
+    }
+    return $true
+}
+
 function Get-UwpVisualStudio {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (-not (Test-Path $vswhere)) { throw 'vswhere.exe not found; install Visual Studio with the UWP C++ tools.' }

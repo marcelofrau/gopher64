@@ -7,6 +7,10 @@ endif()
 
 set(GOPHER64_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 set(UWP_DEPS "${GOPHER64_ROOT}/out/uwp-deps" CACHE PATH "UWP dependency prefix")
+set(GOPHER64_DOZEN_DIR "" CACHE PATH "Directory containing experimental UWP Dozen and DXIL DLLs")
+if(NOT GOPHER64_DOZEN_DIR)
+    message(FATAL_ERROR "Set GOPHER64_DOZEN_DIR to a directory containing UWP vulkan_dzn.dll and dxil.dll")
+endif()
 set(GOPHER64_PACKAGE_VERSION "0.1.0.0" CACHE STRING "Four-part UWP development package version")
 configure_file(Package.appxmanifest.in "${CMAKE_CURRENT_BINARY_DIR}/Package.appxmanifest" @ONLY)
 
@@ -20,6 +24,7 @@ FetchContent_MakeAvailable(imgui)
 
 add_executable(gopher64-uwp WIN32
     host/main.cpp
+    host/dozen_probe.cpp
     "${imgui_SOURCE_DIR}/imgui.cpp"
     "${imgui_SOURCE_DIR}/imgui_draw.cpp"
     "${imgui_SOURCE_DIR}/imgui_tables.cpp"
@@ -35,7 +40,8 @@ set_target_properties(gopher64-uwp PROPERTIES
     MSVC_RUNTIME_LIBRARY MultiThreadedDLL
 )
 target_compile_features(gopher64-uwp PRIVATE cxx_std_17)
-target_include_directories(gopher64-uwp PRIVATE "${UWP_DEPS}/include" "${imgui_SOURCE_DIR}" "${imgui_SOURCE_DIR}/backends")
+target_include_directories(gopher64-uwp PRIVATE "${UWP_DEPS}/include" "${imgui_SOURCE_DIR}" "${imgui_SOURCE_DIR}/backends"
+    "${GOPHER64_ROOT}/parallel-rdp/parallel-rdp-standalone/vulkan-headers/include")
 target_link_libraries(gopher64-uwp PRIVATE
     "${GOPHER64_ROOT}/target/x86_64-uwp-windows-msvc/$<IF:$<CONFIG:Debug>,debug,release>/deps/gopher64.lib"
     "${UWP_DEPS}/lib/SDL3.lib"
@@ -60,6 +66,14 @@ set(package_assets
 target_sources(gopher64-uwp PRIVATE ${package_assets})
 set_source_files_properties(${package_assets} PROPERTIES VS_DEPLOYMENT_CONTENT 1 VS_DEPLOYMENT_LOCATION Assets)
 set(package_dlls "${UWP_DEPS}/bin/SDL3.dll" "${UWP_DEPS}/bin/SDL3_ttf.dll")
+if(GOPHER64_DOZEN_DIR)
+    foreach(dll IN ITEMS vulkan_dzn.dll dxil.dll)
+        if(NOT EXISTS "${GOPHER64_DOZEN_DIR}/${dll}")
+            message(FATAL_ERROR "Missing ${dll} in GOPHER64_DOZEN_DIR: ${GOPHER64_DOZEN_DIR}")
+        endif()
+        list(APPEND package_dlls "${GOPHER64_DOZEN_DIR}/${dll}")
+    endforeach()
+endif()
 target_sources(gopher64-uwp PRIVATE ${package_dlls})
 set_source_files_properties(${package_dlls} PROPERTIES VS_DEPLOYMENT_CONTENT 1)
 

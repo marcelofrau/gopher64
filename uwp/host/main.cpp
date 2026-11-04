@@ -15,6 +15,8 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+
+int g64_dozen_probe(void (*log)(const char*), bool enable_8bit, void* core_window);
 #include <vector>
 
 extern "C" void gopher64_uwp_set_root(const char* root);
@@ -204,6 +206,42 @@ int main(int, char**) {
     log("Starting Gopher64 UWP; LocalState: " + root_utf8);
     gopher64_uwp_set_log_callback(rust_log);
     gopher64_uwp_set_root(root_utf8.c_str());
+
+    std::error_code probe_error;
+    if (std::filesystem::exists(root_path / L"p3-dozen-probe.txt", probe_error)) {
+        log("Dozen probe starting");
+        std::ifstream marker(root_path / L"p3-dozen-probe.txt");
+        std::string mode;
+        marker >> mode;
+        SDL_Window* window = nullptr;
+        void* core_window = nullptr;
+        if (mode == "surface") {
+            if (!SDL_Init(SDL_INIT_VIDEO) || !(window = SDL_CreateWindow("Dozen surface probe", 640, 480, 0))) {
+                log(std::string("Dozen surface probe SDL initialization failed: ") + SDL_GetError());
+                SDL_Quit();
+                close_log();
+                return 1;
+            }
+            core_window = SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WINRT_WINDOW_POINTER, nullptr);
+            if (!core_window) {
+                log("Dozen surface probe: SDL did not provide a CoreWindow");
+                SDL_DestroyWindow(window);
+                SDL_Quit();
+                close_log();
+                return 1;
+            }
+        }
+        const int probe_result = g64_dozen_probe([](const char* message) { log(std::string("[dozen] ") + message); },
+                                                 mode == "8bit" || mode == "surface", core_window);
+        if (window) {
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+        }
+        log("Dozen probe finished with code " + std::to_string(probe_result));
+        close_log();
+        return probe_result;
+    }
+    if (probe_error) log("Could not check Dozen probe marker: " + probe_error.message());
 
     std::string rom;
     const auto config_path = root_path / L"autoboot.txt";

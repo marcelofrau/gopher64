@@ -10,6 +10,12 @@
 #include <cmath>
 #include <map>
 
+#ifdef GOPHER64_UWP
+extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader();
+extern "C" void gopher64_uwp_log_native(const char *message);
+static bool g64_first_swapchain_frame = false;
+#endif
+
 #ifdef _WIN32
 extern "C" {
 __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
@@ -393,6 +399,9 @@ static ImageHandle create_message_image(Vulkan::Device &device, int width,
 
 bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
               size_t font_size, uint32_t save_state_slot) {
+#ifdef GOPHER64_UWP
+  g64_first_swapchain_frame = false;
+#endif
   memset(&rdp_device, 0, sizeof(RDP_DEVICE));
   memset(&callback, 0, sizeof(CALL_BACK));
 
@@ -427,22 +436,45 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   }
   wsi->set_backbuffer_srgb(false);
   Context::SystemHandles handles = {};
+#ifdef GOPHER64_UWP
+  auto loader = g64_uwp_dozen_loader();
+  if (!loader) {
+    rdp_close();
+    return false;
+  }
+  gopher64_uwp_log_native("Dozen: initializing Granite loader and WSI");
+  if (!::Vulkan::Context::init_loader(loader)) {
+#else
   if (!::Vulkan::Context::init_loader(
           (PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr())) {
+#endif
     LOGE("Failed to init vulkan loader.\n");
+#ifdef GOPHER64_UWP
+    gopher64_uwp_log_native("Dozen: Granite loader initialization failed");
+#endif
     rdp_close();
     return false;
   }
   if (!wsi->init_simple(1, handles)) {
     LOGE("Failed to init parallel-rdp.\n");
+#ifdef GOPHER64_UWP
+    gopher64_uwp_log_native("Dozen: Granite WSI initialization failed");
+#endif
     rdp_close();
     return false;
   }
 
   rdp_new_processor();
 
+#ifdef GOPHER64_UWP
+  gopher64_uwp_log_native("Dozen: Granite WSI initialized; checking RDP processor");
+#endif
+
   if (!processor->device_is_supported()) {
     LOGE("Failed to init parallel-rdp processor.\n");
+#ifdef GOPHER64_UWP
+    gopher64_uwp_log_native("Dozen: RDP processor reports unsupported device features");
+#endif
     rdp_close();
     return false;
   }
@@ -460,7 +492,16 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
     return false;
   }
 
+#ifdef GOPHER64_UWP
+  if (!wsi->begin_frame()) {
+    gopher64_uwp_log_native("Dozen: initial WSI begin_frame failed");
+    rdp_close();
+    return false;
+  }
+  gopher64_uwp_log_native("Dozen: initial WSI begin_frame completed");
+#else
   wsi->begin_frame();
+#endif
 
   callback.emu_running = true;
   callback.enable_speedlimiter = true;
@@ -728,8 +769,26 @@ void rdp_update_screen() {
       props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, nullptr);
   if (android_pointer && wsi_platform->is_surface_valid()) {
 #endif
+#ifdef GOPHER64_UWP
+    const bool touched = wsi->get_device().swapchain_touched();
+    if (!wsi->end_frame()) {
+      gopher64_uwp_log_native("Dozen: WSI end_frame failed");
+      callback.emu_running = false;
+      return;
+    }
+    if (touched && !g64_first_swapchain_frame) {
+      g64_first_swapchain_frame = true;
+      gopher64_uwp_log_native("Dozen: first touched swapchain frame completed end_frame");
+    }
+    if (!wsi->begin_frame()) {
+      gopher64_uwp_log_native("Dozen: WSI begin_frame failed");
+      callback.emu_running = false;
+      return;
+    }
+#else
     wsi->end_frame();
     wsi->begin_frame();
+#endif
 #ifdef __ANDROID__
   } else {
     SDL_PumpEvents();

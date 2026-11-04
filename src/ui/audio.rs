@@ -5,8 +5,14 @@ use crate::ui;
 static ADJUST_LOCKED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn init(device: &mut device::Device) {
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log("audio: entering SDL audio subsystem init");
     ui::sdl_init(sdl3_sys::init::SDL_INIT_AUDIO);
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log("audio: SDL audio subsystem initialized; opening stream");
     init_game_audio(device);
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log("audio: game stream initialized");
 }
 
 unsafe extern "C" fn audio_callback(
@@ -64,6 +70,8 @@ pub fn init_game_audio(device: &mut device::Device) {
             std::ptr::null_mut(),
         )
     };
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log("audio: SDL_OpenAudioDeviceStream returned");
     if device.ui.audio.audio_stream.is_null() {
         panic!("Could not create audio stream");
     }
@@ -77,6 +85,8 @@ pub fn init_game_audio(device: &mut device::Device) {
     } {
         panic!("Could not initialize audio stream");
     }
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log("audio: callback and gain configured");
     if device.ai.regs[device::ai::AI_STATUS_REG] & device::ai::AI_STATUS_BUSY != 0 {
         resume_game_audio(&mut device.ui);
     } else {

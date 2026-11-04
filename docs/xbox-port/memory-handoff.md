@@ -19,13 +19,18 @@ Never uninstall the existing app merely to refresh a package: its `LocalState` c
 - A C++/SDL3/ImGui UWP host, VS 2026 solution generation, MSIX, timestamped stage logs, LocalState
   setup, Rust C ABI calls, test-ROM autoboot, and PC build/test scripts now exist. ImGui is only a
   minimal status/error screen, not the finished game library or settings frontend.
-- Release and Debug host packages build on PC. The registered PC app presents its status frame,
-  calls Rust, and reports a missing ROM. A copied real ROM reaches SDL video initialization, where
-  `Vulkan support is not configured in SDL`; `rdp_init` and game rendering are **not reached**.
-- The user's first local VS F5 failed with `0xc0000135`. A Debug/Release CRT mismatch was proven and
-  corrected; the local registered app worked after the fix. **The user has not yet repeated VS F5.**
-- P2 is **in progress, not complete**. No Xbox deployment, tile launch, F5, gameplay, audio, input,
+- The user verified the minimal status screen and ROM picker by VS F5 on PC. The original SDL
+  Vulkan error was bypassed using the experimental packaged Dozen ICD and CoreWindow WSI. An
+  isolated PC ROM test now reaches and successfully returns from `rdp_init`, but hangs in
+  `SDL_OpenAudioDeviceStream` before any game frame or CPU loop has been observed. The integrated
+  P3 build has been compiled in Debug only; it is not proven functional or ready for gameplay.
+- The user's first local VS F5 failed with `0xc0000135` due to a proven Debug/Release CRT mismatch;
+  the later local F5 succeeded. The user has not yet run the current experimental P3 build via F5.
+- P2/P3 remain **in progress, not complete**. No Xbox deployment, tile launch, F5, gameplay, audio, input,
   lifecycle, or save verification has been performed. The user alone performs future Xbox tests.
+- `build-host.ps1` now requires an experimental UWP Dozen ICD and `dxil.dll`, from
+  `GOPHER64_DOZEN_DIR`/`-DozenDir` or the sibling ScummVM RetroArch checkout. The currently tested
+  candidate is Mesa 25.3.3, not the 26.2.4 desktop baseline; binaries are not committed.
 - API-level Store validation, Xbox module availability, dynamic imports, signing/trust and
   `APPX0006` (`runFullTrust`) remain open. The import-module audit is not certification.
 - The fixes to ROM error handling and RDRAM allocation touch shared upstream files, and the SDL
@@ -279,6 +284,13 @@ and authorized continuing with Dozen integration. Direct/brokered ROM access rem
 - The candidate advertises `VK_EXT_external_memory_host` on both GPUs, so the P0 requirement to
   disable imported host RDRAM cannot be assumed automatically; verify the C runtime environment
   and implement the P0-safe behavior before claiming game compatibility.
+- A separate SDL WinRT window/ICD probe enabled `VK_KHR_surface` and `VK_KHR_win32_surface`,
+  created the Mesa-specific CoreWindow surface, and obtained successful GPU surface capabilities
+  (`1200x480`) on the PC. This is not a swapchain or a rendered frame. The first automated check
+  incorrectly expected the text `surface caps` instead of `surface capabilities`; after correcting
+  the test, it passed. The driver reports external-host support, so a UWP-only compilation wrapper
+  is being tested to force the P0 copy path and use `GetEnvironmentVariableA` instead of unsupported
+  UWP CRT `getenv` in `rdp_device.cpp`; the submodule itself is untouched.
 
 ### User-supplied UWP artwork — 2026-11-04
 
@@ -294,3 +306,39 @@ and authorized continuing with Dozen integration. Direct/brokered ROM access rem
   image; visual appearance on an installed PC tile and on Xbox remains untested.
 - While work was underway the user added base splash/store and 200%-wide variants; they are also
   included. The `runFullTrust` `APPX0006` warning remains.
+
+### P3 integrated ROM smoke and end-of-day handoff — 2026-11-04
+
+- The UWP game path now loads the packaged ICD, requests the P0 8-bit option using the documented
+  process-level Win32 environment API, creates a Mesa-specific CoreWindow Vulkan surface and
+  initializes Granite WSI. The UWP-only RDP environment wrapper forces external RDRAM host imports
+  off and reads other device options via Win32; an isolated UWP self-check verified the override.
+- A PC-only Super Mario 64 smoke reached ICD negotiation, created two surfaces, initialized WSI,
+  completed the initial `begin_frame`, and returned from `rdp_init`. No game frame appeared during
+  the subsequent 60 seconds. A further 25-second repeat logged `FPS counter task started`,
+  `audio: SDL audio subsystem initialized; opening stream`, and then no return from
+  `SDL_OpenAudioDeviceStream`; the isolated proof process was terminated after timeout. This is a
+  reproducible hang, **not** a successful game test, and no screen contents were verified.
+- SDL's WinRT WASAPI source uses semaphore waits around `ActivateAudioInterfaceAsync`; this is a
+  lead, not a proven stack or root cause. Ymir calls the same SDL stream API, and SDL documents it
+  as thread-safe. Tomorrow, capture the stuck process's real stack and compare COM/dispatcher and
+  SDL lifetime with Ymir before choosing a supported fix. Do not silently disable audio or abandon
+  the Dozen goal. A first CDB observer started too late and missed the log; a second was deliberately
+  left without a target after the user requested a stop. No stack has been captured.
+- An earlier smoke script prematurely stopped its test because `ReadAllText` could not share the
+  actively written log; switching to the existing shared-reader fixed the harness. A surface probe
+  had a separate false-negative due to `caps` versus `capabilities`; its corrected rerun passed.
+- The user offered to run F5 on PC, then explicitly asked to stop and resume tomorrow. Do not
+  access, deploy to, or launch on Xbox. The current P3 code is experimental and may hang at audio.
+- The user explicitly authorized versioning the previously untracked local asset sources, including
+  PSDs, the social preview, and reference images, for the other machine. These are source assets;
+  generated `out/` builds, copied third-party DLLs, ROMs, and installed proof-package data are not
+  source and must not be added to Git.
+- The build-module audit checks the ICD and DXIL DLLs, and permits only three documented UWP ETW
+  functions from `advapi32.dll`; unknown symbols and ordinals remain rejected. API-level Store
+  validation and `APPX0006` remain open. No Store/Xbox certification is claimed.
+- End-of-day checks: UWP Debug host/package and import-module audit passed; desktop `cargo test
+  --lib --locked` passed all 9 tests; desktop Clippy with and without default features passed with
+  `-Dwarnings`; formatting, PowerShell parse and the Dozen/audit script self-checks passed. Existing
+  native C/C++ deprecated-API and signedness warnings, Debug `LNK4075`, and `APPX0006` remain. No
+  latest P3 Release UWP build, desktop gameplay/save test, visual game frame, or Xbox test was run.

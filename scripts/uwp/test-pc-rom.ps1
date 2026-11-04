@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Rom,
+    [ValidateSet('Init', 'Frame')][string]$ExpectedStage = 'Init',
     [ValidateRange(1, 600)][int]$TimeoutSeconds = 20
 )
 
@@ -33,21 +34,22 @@ try {
     Write-Host 'Starting the installed UWP app with a temporary copy of the ROM; gameplay is not a test criterion.'
     Start-Process "shell:AppsFolder\$($package.PackageFamilyName)!App"
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $successPattern = if ($ExpectedStage -eq 'Frame') { 'Dozen: first touched swapchain frame completed end_frame' } else { '\[rust\] rdp_init succeeded' }
     do {
         Start-Sleep -Milliseconds 250
         $lines = @(Read-UwpLog $log | Select-Object -Skip $previous)
         $text = $lines -join "`n"
-    } while ((Get-Date) -lt $deadline -and $text -notmatch 'Host exiting|\[rust\] panic:')
+    } while ((Get-Date) -lt $deadline -and $text -notmatch "Host exiting|\[rust\] panic:|$successPattern")
     $lines | ForEach-Object { Write-Host $_ }
     if ($text -match 'Rust returned|\[rust\] panic:') {
         Get-Process 'gopher64-uwp' -ErrorAction SilentlyContinue | Wait-Process -Timeout 5 -ErrorAction SilentlyContinue
     }
     if ($text -match '\[rust\] panic:') { throw 'Rust panicked during ROM startup; see the log above.' }
     if ($text -match 'Rust returned [1-9]' -and $text -notmatch 'Restored status frame presented') { throw 'The frontend did not display the error after Rust returned.' }
-    if ($text -notmatch '\[rust\] entering rdp_init') { throw 'Did not reach rdp_init; see the log above.' }
+    if ($text -notmatch $successPattern) { throw "Did not reach the requested $ExpectedStage milestone; see the log above." }
     if ($text -match 'Rust returned [1-9]') { throw 'The Rust entry returned an error after reaching rdp_init; see the log above.' }
     if ($text -notmatch 'Host exiting' -and -not (Get-Process 'gopher64-uwp' -ErrorAction SilentlyContinue)) { throw 'The app exited unexpectedly; see the log above.' }
-    Write-Host 'Observed entry into rdp_init; this does not prove that Vulkan or gameplay works.'
+    Write-Host "Observed $ExpectedStage milestone; this does not prove image correctness, gameplay, or Xbox support."
 } finally {
     if ($createdAutoboot) { Remove-Item -LiteralPath $autoboot }
     if ($createdMarker) { Remove-Item -LiteralPath $testMarker }

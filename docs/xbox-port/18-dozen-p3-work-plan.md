@@ -3,6 +3,11 @@
 Status: implementation in progress; P3 is not complete. The user authorized this work on
 2026-11-04. All agent-run deployment and runtime tests are PC-only; the user alone operates Xbox.
 
+**End-of-day checkpoint:** steps 1–3 reached ICD/device and CoreWindow surface on the PC; step 4
+reached `rdp_init` successfully but then hung in `SDL_OpenAudioDeviceStream`, before any game
+frame. The precise root cause, visual output, audio, Xbox and release certification remain unproven.
+See the [work journal](memory-handoff.md) for experiments and the next diagnostic.
+
 ## Baselines and constraints
 
 - The P0 desktop checkpoint used Dozen 26.2.4 and established the game/renderer baseline described
@@ -34,3 +39,13 @@ Status: implementation in progress; P3 is not complete. The user authorized this
 
 The single-slot ROM staging change is tracked separately in `memory-handoff.md`; direct brokered
 access and a persistent ROM library remain later work.
+
+## Local candidate selection
+
+`scripts/uwp/build-host.ps1` accepts `-DozenDir` or the `GOPHER64_DOZEN_DIR` environment variable.
+If neither is set, it looks for the existing ScummVM/RetroArch UWP Mesa x64 directory in the
+workspace. The directory must contain both `vulkan_dzn.dll` and `dxil.dll`; the build reports their
+SHA-256 hashes and packages copies, never the originals. If no candidate is available, the host
+build fails with instructions instead of silently packaging an app without its graphics driver.
+The known local Mesa 25.3.3 binary is a diagnostic candidate, not an asserted match to the P0
+26.2.4 desktop baseline.

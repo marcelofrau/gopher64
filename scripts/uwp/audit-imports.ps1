@@ -18,8 +18,11 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Package).Path)
 try {
     foreach ($name in @('gopher64-uwp.exe', 'SDL3.dll', 'SDL3_ttf.dll')) {
+        if (-not $zip.GetEntry($name)) { throw "Package is missing $name" }
+    }
+    $names = @('gopher64-uwp.exe') + @($zip.Entries | Where-Object { $_.FullName -match '^[^/\\]+\.dll$' } | ForEach-Object FullName)
+    foreach ($name in $names) {
         $entry = $zip.GetEntry($name)
-        if (-not $entry) { throw "Package is missing $name" }
         [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $audit $name))
     }
 } finally { $zip.Dispose() }
@@ -27,7 +30,7 @@ try {
 $blocked = @('winmm.dll', 'user32.dll', 'gdi32.dll', 'shell32.dll', 'advapi32.dll', 'dwmapi.dll', 'uxtheme.dll',
              'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'vccorlib140.dll')
 $failures = @()
-foreach ($name in @('gopher64-uwp.exe', 'SDL3.dll', 'SDL3_ttf.dll')) {
+foreach ($name in $names) {
     $result = & $dumpbin /imports (Join-Path $audit $name)
     if ($LASTEXITCODE -ne 0) { throw "dumpbin failed for $name (exit $LASTEXITCODE)" }
     $result | Set-Content -LiteralPath (Join-Path $audit "$name.imports.txt") -Encoding utf8
@@ -35,6 +38,10 @@ foreach ($name in @('gopher64-uwp.exe', 'SDL3.dll', 'SDL3_ttf.dll')) {
     if ($modules.Count -eq 0) { throw "No import modules parsed for $name; inspect dumpbin output." }
     Write-Host "$name imports: $($modules -join ', ')"
     foreach ($module in $modules) {
+        if ($module -eq 'advapi32.dll' -and (Test-UwpAllowedAdvapiImports $result)) {
+            Write-Host "$name imports only documented UWP ETW functions from advapi32.dll"
+            continue
+        }
         if ($module -in $blocked -or (Test-UwpDebugCrtImport $module)) {
             $failures += "$name imports $module"
         }

@@ -4,6 +4,11 @@
 been exercised on a Windows PC. No Xbox installation, tile launch, F5 session, `rdp_init`, or game
 rendering has been verified. This is a development package, not a release.
 
+> This file records the earlier P2 baseline. The later experimental P3 Dozen integration reaches
+> `rdp_init` on a PC, then hangs opening the SDL audio stream; see the current
+> [work journal](memory-handoff.md) and [P3 plan](18-dozen-p3-work-plan.md). No game frame or Xbox
+> execution has been verified.
+
 ## What exists
 
 - `uwp/CMakeLists.txt`, `uwp/host/main.cpp` and `uwp/Package.appxmanifest.in` build a WindowsStore

@@ -69,8 +69,14 @@ pub fn run_game(
     rdram::init(device);
 
     ui::video::init(device, netplay_config.is_some())?;
+    #[cfg(target_vendor = "uwp")]
+    ui::uwp::entry::log("initializing audio");
     ui::audio::init(device);
+    #[cfg(target_vendor = "uwp")]
+    ui::uwp::entry::log("audio initialized; initializing input");
     ui::input::init(&mut device.ui);
+    #[cfg(target_vendor = "uwp")]
+    ui::uwp::entry::log("input initialized; initializing emulated hardware");
 
     // must be after video init
     if let Some(netplay_config) = &netplay_config {
@@ -116,6 +122,8 @@ pub fn run_game(
         cheats::init(device, game_settings.cheats);
     }
 
+    #[cfg(target_vendor = "uwp")]
+    ui::uwp::entry::log("entering emulated CPU loop");
     cpu::run(device);
 
     retroachievements::unload_game(discord_watch_tx, discord_handle);

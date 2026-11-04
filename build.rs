@@ -2,6 +2,7 @@ fn main() {
     println!("cargo::rerun-if-changed=parallel-rdp");
     println!("cargo::rerun-if-changed=retroachievements");
     println!("cargo::rerun-if-changed=src/compat");
+    println!("cargo::rerun-if-changed=uwp/compat");
     println!("cargo::rerun-if-changed=data/translations");
     println!("cargo::rerun-if-changed=data/ui");
 
@@ -12,6 +13,7 @@ fn main() {
         slint_build::compile_with_config("src/ui/gui/appwindow.slint", slint_config).unwrap();
     }
 
+    let uwp = std::env::var("CARGO_CFG_TARGET_VENDOR").unwrap_or_default() == "uwp";
     let mut simd_build = cc::Build::new();
     let mut volk_build = cc::Build::new();
     volk_build
@@ -26,7 +28,11 @@ fn main() {
         .flag("-Wno-missing-field-initializers")
         .flag("-Wno-unused-function")
         .file("parallel-rdp/parallel-rdp-standalone/parallel-rdp/command_ring.cpp")
-        .file("parallel-rdp/parallel-rdp-standalone/parallel-rdp/rdp_device.cpp")
+        .file(if uwp {
+            "uwp/compat/rdp_device_uwp.cpp"
+        } else {
+            "parallel-rdp/parallel-rdp-standalone/parallel-rdp/rdp_device.cpp"
+        })
         .file("parallel-rdp/parallel-rdp-standalone/parallel-rdp/rdp_dump_write.cpp")
         .file("parallel-rdp/parallel-rdp-standalone/parallel-rdp/rdp_renderer.cpp")
         .file("parallel-rdp/parallel-rdp-standalone/parallel-rdp/video_interface.cpp")
@@ -136,8 +142,8 @@ fn main() {
     // UWP-PORT: compile the C/C++ (volk, parallel-rdp, rcheevos) under WINAPI_FAMILY_APP
     // with clang-cl, force-including the compat header, and without LTO bitcode (the host
     // links the staticlib, not rust-lld). See docs/xbox-port/05 §7. (D-14)
-    let uwp = std::env::var("CARGO_CFG_TARGET_VENDOR").unwrap_or_default() == "uwp";
     if uwp {
+        rdp_build.file("uwp/compat/dozen_loader.cpp");
         for b in [
             &mut volk_build,
             &mut rdp_build,

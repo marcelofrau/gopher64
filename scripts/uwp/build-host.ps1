@@ -2,6 +2,7 @@
 param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
     [switch]$SkipRust,
+    [string]$DozenDir = $env:GOPHER64_DOZEN_DIR,
     [switch]$SkipDependencies,
     [switch]$InitSubmodules,
     [string]$PackageVersion
@@ -13,6 +14,18 @@ Set-StrictMode -Version Latest
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $vs = Get-UwpVisualStudio
 $build = Join-Path $root "out/uwp-host-vs$($vs.Version)"
+$candidate = Join-Path $root '../scummvm-uwp/extern/retroarch/pkg/msvc-uwp/RetroArch-msvcUWP/MESA/x64'
+if (-not $DozenDir -and (Test-Path -LiteralPath (Join-Path $candidate 'vulkan_dzn.dll'))) { $DozenDir = $candidate }
+if ($DozenDir) {
+    $DozenDir = (Resolve-Path -LiteralPath $DozenDir).Path
+    foreach ($dll in @('vulkan_dzn.dll', 'dxil.dll')) {
+        $path = Join-Path $DozenDir $dll
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing Dozen input: $path" }
+        Write-Host "$dll SHA256: $((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash)"
+    }
+} else {
+    throw 'Dozen ICD not found. Set GOPHER64_DOZEN_DIR or pass -DozenDir with UWP vulkan_dzn.dll and dxil.dll.'
+}
 if (-not $PackageVersion) {
     $now = [DateTime]::UtcNow
     $days = [int]($now.Date - [DateTime]::new(2020, 1, 1)).TotalDays
@@ -30,7 +43,7 @@ if (-not $SkipRust) {
 Write-Host "Configuring UWP host: $($vs.Generator) ($($vs.Install))"
 Write-Host "Development package version: $PackageVersion"
 & cmake -S (Join-Path $root 'uwp') -B $build -G $vs.Generator -A x64 `
-    '-DCMAKE_SYSTEM_NAME=WindowsStore' '-DCMAKE_SYSTEM_VERSION=10.0' "-DGOPHER64_PACKAGE_VERSION=$PackageVersion"
+    '-DCMAKE_SYSTEM_NAME=WindowsStore' '-DCMAKE_SYSTEM_VERSION=10.0' "-DGOPHER64_PACKAGE_VERSION=$PackageVersion" "-DGOPHER64_DOZEN_DIR=$DozenDir"
 if ($LASTEXITCODE) { throw "UWP host configuration failed ($LASTEXITCODE)." }
 & cmake --build $build --config $Configuration --target gopher64-uwp --parallel
 if ($LASTEXITCODE) { throw "UWP host build failed ($LASTEXITCODE)." }

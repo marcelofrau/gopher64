@@ -1,8 +1,34 @@
 #include "wsi_platform.hpp"
 #include <SDL3/SDL_vulkan.h>
+#ifdef GOPHER64_UWP
+#include <SDL3/SDL_properties.h>
+#include <cstdio>
+extern "C" void gopher64_uwp_log_native(const char *message);
+#endif
 
 VkSurfaceKHR SDL_WSIPlatform::create_surface(VkInstance instance,
                                              VkPhysicalDevice gpu) {
+#ifdef GOPHER64_UWP
+  auto core_window = SDL_GetPointerProperty(SDL_GetWindowProperties(window),
+                                             SDL_PROP_WINDOW_WINRT_WINDOW_POINTER,
+                                             nullptr);
+  if (!core_window || !vkCreateWin32SurfaceKHR) {
+    gopher64_uwp_log_native("Dozen: CoreWindow or Vulkan surface entry point is unavailable");
+    surface_valid = false;
+    return VK_NULL_HANDLE;
+  }
+  VkWin32SurfaceCreateInfoKHR info{};
+  info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+  // Mesa's UWP WSI uses the current CoreWindow instead of interpreting this as an HWND.
+  info.hwnd = reinterpret_cast<HWND>(core_window);
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
+  const VkResult result = vkCreateWin32SurfaceKHR(instance, &info, nullptr, &surface);
+  char message[128];
+  std::snprintf(message, sizeof(message), "Dozen: vkCreateWin32SurfaceKHR result=%d", result);
+  gopher64_uwp_log_native(message);
+  surface_valid = result == VK_SUCCESS;
+  return surface_valid ? surface : VK_NULL_HANDLE;
+#else
   VkSurfaceKHR surface = nullptr;
   bool result = SDL_Vulkan_CreateSurface(window, instance, NULL, &surface);
   if (result != true) {
@@ -12,15 +38,23 @@ VkSurfaceKHR SDL_WSIPlatform::create_surface(VkInstance instance,
     surface_valid = true;
   }
   return surface;
+#endif
 }
 
 void SDL_WSIPlatform::destroy_surface(VkInstance instance,
                                       VkSurfaceKHR surface) {
   surface_valid = false;
+#ifdef GOPHER64_UWP
+  if (surface) vkDestroySurfaceKHR(instance, surface, nullptr);
+#else
   SDL_Vulkan_DestroySurface(instance, surface, NULL);
+#endif
 }
 
 std::vector<const char *> SDL_WSIPlatform::get_instance_extensions() {
+#ifdef GOPHER64_UWP
+  return {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME};
+#else
 
   unsigned int extensionCount = 0;
   char const *const *extensions =
@@ -34,6 +68,7 @@ std::vector<const char *> SDL_WSIPlatform::get_instance_extensions() {
     extensionNames.push_back(extensions[i]);
   }
   return extensionNames;
+#endif
 }
 
 uint32_t SDL_WSIPlatform::get_surface_width() {

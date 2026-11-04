@@ -70,6 +70,11 @@ pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
     let mut flags = sdl3_sys::video::SDL_WINDOW_VULKAN
         | sdl3_sys::video::SDL_WINDOW_RESIZABLE
         | sdl3_sys::video::SDL_WINDOW_INPUT_FOCUS;
+    // UWP-PORT: Mesa creates the CoreWindow surface directly; SDL WinRT has no Vulkan backend.
+    #[cfg(target_vendor = "uwp")]
+    {
+        flags &= !sdl3_sys::video::SDL_WINDOW_VULKAN;
+    }
 
     if device.ui.video.fullscreen {
         flags |= sdl3_sys::video::SDL_WINDOW_FULLSCREEN;
@@ -102,7 +107,7 @@ pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
     };
 
     #[cfg(target_vendor = "uwp")]
-    crate::ui::uwp::entry::log("creating SDL Vulkan game window");
+    crate::ui::uwp::entry::log("creating SDL game window for Dozen WSI");
     device.ui.video.window = unsafe {
         sdl3_sys::video::SDL_CreateWindow(window_title.as_ptr(), window_width, window_height, flags)
     };
@@ -175,6 +180,8 @@ pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
     #[cfg(target_vendor = "uwp")]
     crate::ui::uwp::entry::log("rdp_init succeeded");
     fps_counter(&mut device.ui);
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log("FPS counter task started");
     Ok(())
 }
 
