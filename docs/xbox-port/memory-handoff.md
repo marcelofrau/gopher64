@@ -319,6 +319,8 @@ and authorized continuing with Dozen integration. Direct/brokered ROM access rem
   `audio: SDL audio subsystem initialized; opening stream`, and then no return from
   `SDL_OpenAudioDeviceStream`; the isolated proof process was terminated after timeout. This is a
   reproducible hang, **not** a successful game test, and no screen contents were verified.
+  Timestamped excerpts with machine paths omitted are in
+  [the PC evidence log](evidence/2026-11-04-dozen-pc.md).
 - SDL's WinRT WASAPI source uses semaphore waits around `ActivateAudioInterfaceAsync`; this is a
   lead, not a proven stack or root cause. Ymir calls the same SDL stream API, and SDL documents it
   as thread-safe. Tomorrow, capture the stuck process's real stack and compare COM/dispatcher and
