@@ -246,3 +246,51 @@ and authorized continuing with Dozen integration. Direct/brokered ROM access rem
   entry points and contains the `dzn_enable_8bit_loads_stores` option. The sibling `mesa-uwp`
   checkout is 26.2.0. Treat the older DLL only as a diagnostic candidate until actual device
   features and compatibility are proven; do not claim P0 parity.
+
+### P3 ICD baseline probe — 2026-11-04
+
+- Added an opt-in PC probe using `p3-dozen-probe.txt`: load the packaged driver, negotiate ICD v5,
+  create a Vulkan instance, enumerate GPUs and query their 8-bit storage features. It does not
+  initialize parallel-rdp, create a Vulkan surface or prove gameplay. The build obtains two DLLs
+  from an explicit `GOPHER64_DOZEN_DIR` or the known local RetroArch sibling and logs SHA-256;
+  binaries are not committed. The candidate is Mesa 25.3.3, not the 26.2.4 P0 binary.
+- An initially broken audit referred to an unset extraction variable; fixed and reran it. Auditing
+  every packaged root DLL found `dxil.dll` importing `advapi32.dll`. Inspection found only
+  `EventRegister`, `EventUnregister` and `EventWriteTransfer`. Microsoft documents all three for
+  UWP, so the module check now permits only this exact ETW set; a missing/unparseable import list,
+  any other symbol, and ordinal imports fail closed. Added positive/negative parser tests. This is
+  not full API-level certification; `APPX0006` and dynamic import risks remain.
+- Isolated PC package with the ICD deliberately removed produced explicit error 126. With the DLL
+  restored, ICD negotiation succeeded (interface 5), instance creation succeeded and two devices
+  were enumerated: RTX 4070 SUPER and Microsoft Basic Render Driver. Both reported
+  `storageBuffer8BitAccess=0` and `uniformAndStorageBuffer8BitAccess=0` with default options.
+  parallel-rdp checks `storageBuffer8BitAccess` and P0 required `dzn_enable_8bit_loads_stores=true`;
+  therefore ICD load/enumeration alone is not compatibility or a first frame.
+- Follow-up hypothesis: Microsoft documents `SetEnvironmentVariableW` for UWP; the reference
+  `ashes-vk-uwp/uwp/main.cpp` uses it and `mesa-uwp`'s `origin/uwp-25.3.3:src/util/os_misc.c`
+  reads options with `GetEnvironmentVariableA`, not the CRT `getenv` snapshot. An opt-in probe
+  with that P0 flag is being prepared; whether the GPU advertises 8-bit storage remains unproven.
+  This affects only the process and does not change system/user environment variables.
+- The follow-up isolated UWP PC probe confirmed the hypothesis: after setting the process-only flag
+  with `SetEnvironmentVariableW`, both enumerated devices reported `storageBuffer8BitAccess=1` and
+  `uniformAndStorageBuffer8BitAccess=1`; ICD negotiation and instance creation still succeeded.
+  This proves one P0 prerequisite for the candidate on the tested PC, not shader correctness,
+  surface/swapchain behavior, P0 version parity, performance or Xbox support.
+- The candidate advertises `VK_EXT_external_memory_host` on both GPUs, so the P0 requirement to
+  disable imported host RDRAM cannot be assumed automatically; verify the C runtime environment
+  and implement the P0-safe behavior before claiming game compatibility.
+
+### User-supplied UWP artwork — 2026-11-04
+
+- The user supplied Windows asset variants and asked for manifest/package integration using the
+  ScummVM UWP project as reference. Added wide, small, and large tile and lock-screen metadata;
+  packaged the supplied scaled splash, tile, app-list, store, badge, and wide variants. Retained
+  the legacy unscaled square images in the repository but did not package them, preventing them
+  from taking precedence over the new art. The user's ScummVM reference images and full-resolution
+  artwork remain untouched and are not shipped in the package.
+- The user's 620x620 large-tile PNG exceeded the UWP 204,800-byte limit (`APPX3207`). Created a
+  separate OptiPNG-derived image; it is 200,882 bytes and ImageMagick pixel absolute-error count
+  is zero. The original was not overwritten. The package built successfully with the derived
+  image; visual appearance on an installed PC tile and on Xbox remains untested.
+- While work was underway the user added base splash/store and 200%-wide variants; they are also
+  included. The `runFullTrust` `APPX0006` warning remains.

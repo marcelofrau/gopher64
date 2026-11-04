@@ -44,10 +44,18 @@ target_link_libraries(gopher64-uwp PRIVATE
 )
 
 set(package_assets
-    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Square44x44Logo.png"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Square150x150Logo.png"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/StoreLogo.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/LockScreenLogo.scale-200.png"
     "${CMAKE_CURRENT_SOURCE_DIR}/Assets/SplashScreen.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/SplashScreen.scale-200.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Square150x150Logo.scale-200.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Square310x310Logo.optimized.scale-200.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Square44x44Logo.scale-200.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Square44x44Logo.targetsize-24_altform-unplated.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Square71x71Logo.scale-200.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/StoreLogo.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/StoreLogo.scale-200.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Wide310x150Logo.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Wide310x150Logo.scale-200.png"
 )
 target_sources(gopher64-uwp PRIVATE ${package_assets})
 set_source_files_properties(${package_assets} PROPERTIES VS_DEPLOYMENT_CONTENT 1 VS_DEPLOYMENT_LOCATION Assets)
