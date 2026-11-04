@@ -13,6 +13,10 @@ rendering has been verified. This is a development package, not a release.
 - The host uses `LocalState` for the existing Rust config/data/cache paths. It logs host and explicitly
   instrumented Rust entry/video messages with timestamps to `LocalState/gopher64-host.log` and the
   debugger. This is **not yet capture of every SDL/RDP/native or Rust stderr line**.
+- Without autoboot, the host opens the native WinRT ROM picker at startup and offers retry after
+  cancellation or failure. It copies the selected ROM to app temporary storage before passing its
+  path to Rust; the original is not modified. The staged files and recent-ROM paths are temporary,
+  not a finished library; see `memory-handoff.md` for the limitation and PC test evidence.
 - An optional UTF-8 `LocalState/autoboot.txt` contains one absolute ROM path. No ROM is packaged.
   The host presents its status screen, tears down its SDL/ImGui resources, calls the existing Rust
   entry synchronously on that thread, and attempts to restore the status screen after return. It
@@ -30,12 +34,12 @@ rendering has been verified. This is a development package, not a release.
 |---|---|
 | VS 2026 Release and Debug builds | Both host configurations linked and generated MSIX. Build output included existing `parallel-rdp` deprecated CRT/signedness warnings, Debug `LNK4075`, and manifest `APPX0006` for `runFullTrust`. |
 | PC installation | Development MSIX installed with existing trusted CMake test certificate and existing VCLibs; no certificate store or VCLibs changes were needed. `install-pc.ps1` was exercised. |
-| ImGui status | SDL selected `direct3d11`; a status frame was presented and logged. This is not a screenshot or visual QA. |
+| ImGui status | SDL selected `direct3d11`; a status frame was presented. A PC VS F5 screenshot confirms the minimal status screen, not final visual QA. |
 | Missing ROM | `test-pc-probe.ps1` presented a frame, invoked Rust, received an error rather than abort, and exited cleanly. |
 | Real ROM autoboot | A temporary copy of Super Mario 64 was loaded from LocalState. SDL WinRT reported `Vulkan support is not configured in SDL`; the Rust error returned to the host, and a restored status frame was presented. `rdp_init` was **not reached**. The test deliberately exits nonzero for this unmet criterion. |
 | Import audit | EXE, SDL3 and SDL_ttf import tables recorded; selected desktop modules and non-Store CRT DLLs not found. `ntdll.dll`, `crypt32.dll`, and `kernel32.dll` are present. Module names alone do **not** establish supported APIs; dynamic imports and Xbox availability remain unverified. |
 | Desktop regression smoke | In a separate portable directory with a copied ROM, desktop Release initialized Vulkan on the RTX 4070 SUPER, created a 640×480 swapchain, stayed alive for 12 seconds and exited normally after a window-close request. No visual gameplay or real save/load was verified. |
-| VS 2026 | `open-vs.ps1 -Configuration Debug -SkipDependencies` generated the Debug package and launched the solution. A user F5 on PC failed with missing Debug CRT dependencies; the subsequent fix and local app activation are documented below. A new VS F5 and Xbox remote debugging have not yet been verified. |
+| VS 2026 | A user F5 on PC initially failed with missing Debug CRT dependencies. After the fix, the user confirmed the status screen via PC F5. Xbox remote debugging remains unverified. |
 | Rust tests | `cargo test --lib --locked`: 8 passed, covering ROM validation, raw/ZIP/7z input, config-write errors, RDRAM alignment and legacy postcard serialization. These do not prove Xbox gameplay. |
 | Formatting and lint | `cargo fmt --all -- --check` and both Clippy configurations (`cargo clippy -- -Dwarnings` and `--no-default-features`) passed after fixing two new lint findings. Native C/C++ warnings remain. |
 

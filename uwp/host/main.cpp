@@ -5,10 +5,13 @@
 #include <imgui_impl_sdlrenderer3.h>
 
 #include <windows.h>
+#include <ppltasks.h>
 #include <share.h>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <memory>
+#include <utility>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -72,6 +75,83 @@ std::string utf8(const std::wstring& text) {
     return result;
 }
 
+struct PickerState {
+    std::mutex mutex;
+    bool pending = false;
+    bool done = false;
+    std::string path;
+    std::string error;
+    std::string progress;
+};
+
+constexpr bool picker_on_launch(bool autoboot, bool probe, bool after_game) {
+    return !autoboot && !probe && !after_game;
+}
+static_assert(picker_on_launch(false, false, false));
+static_assert(!picker_on_launch(true, false, false));
+static_assert(!picker_on_launch(false, true, false));
+static_assert(!picker_on_launch(false, false, true));
+
+void choose_rom(const std::shared_ptr<PickerState>& state) {
+    {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        if (state->pending) return;
+        state->pending = true;
+        state->done = false;
+        state->path.clear();
+        state->error.clear();
+        state->progress.clear();
+    }
+    try {
+        auto picker = ref new Windows::Storage::Pickers::FileOpenPicker();
+        for (auto extension : {L".n64", L".v64", L".z64", L".bin", L".zip", L".7z"}) {
+            picker->FileTypeFilter->Append(ref new Platform::String(extension));
+        }
+        // shortcut: staged ROMs remain until Windows clears them; use brokered access for the full library.
+        concurrency::create_task(picker->PickSingleFileAsync()).then(
+            [state](Windows::Storage::StorageFile^ file) -> concurrency::task<Windows::Storage::StorageFile^> {
+                if (!file) return concurrency::task_from_result<Windows::Storage::StorageFile^>(nullptr);
+                {
+                    std::lock_guard<std::mutex> lock(state->mutex);
+                    state->progress = "Copying selected ROM to temporary app storage...";
+                }
+                auto folder = Windows::Storage::ApplicationData::Current->TemporaryFolder;
+                return concurrency::create_task(file->CopyAsync(
+                    folder, file->Name, Windows::Storage::NameCollisionOption::GenerateUniqueName));
+            }).then(
+            [state](concurrency::task<Windows::Storage::StorageFile^> result) {
+                std::string path;
+                std::string error;
+                try {
+                    auto file = result.get();
+                    if (file) {
+                        auto value = file->Path;
+                        path = utf8(std::wstring(value->Data(), value->Length()));
+                        if (path.empty()) error = "The selected file has no usable path.";
+                    }
+                } catch (Platform::Exception^ exception) {
+                    auto message = exception->Message;
+                    error = utf8(std::wstring(message->Data(), message->Length()));
+                    if (error.empty()) error = "Windows could not complete the file picker.";
+                } catch (const std::exception& exception) {
+                    error = exception.what();
+                }
+                std::lock_guard<std::mutex> lock(state->mutex);
+                state->path = std::move(path);
+                state->error = std::move(error);
+                state->pending = false;
+                state->done = true;
+            }, concurrency::task_continuation_context::use_current());
+    } catch (Platform::Exception^ exception) {
+        auto message = exception->Message;
+        std::lock_guard<std::mutex> lock(state->mutex);
+        state->error = utf8(std::wstring(message->Data(), message->Length()));
+        if (state->error.empty()) state->error = "Windows could not open the file picker.";
+        state->pending = false;
+        state->done = true;
+    }
+}
+
 int run_rust(const std::string& rom) {
     {
         std::lock_guard<std::mutex> lock(log_mutex);
@@ -129,7 +209,7 @@ int main(int, char**) {
         if (rom.compare(0, 3, "\xef\xbb\xbf") == 0) rom.erase(0, 3);
         config.close();
     }
-    std::string status = "Ready. Create autoboot.txt in LocalState with the UTF-8 path to a ROM.";
+    std::string status = "Select a ROM to start.";
     std::error_code config_error;
     const bool config_exists = std::filesystem::exists(config_path, config_error);
     if (config_error) status = "Cannot check autoboot.txt: " + config_error.message();
@@ -206,6 +286,8 @@ int main(int, char**) {
         std::error_code debug_error;
         std::error_code test_error;
         const bool auto_close_test = after_game && std::filesystem::is_regular_file(root_path / L"p2-rom-test.txt", test_error);
+        const auto picker = std::make_shared<PickerState>();
+        bool open_picker = picker_on_launch(autoboot, auto_probe, after_game);
         if (!after_game && std::filesystem::is_regular_file(root_path / L"p2-debug-wait.txt", debug_error)) {
             log("Diagnostic mode: waiting 8 seconds for debugger attachment");
             SDL_Delay(8000);
@@ -234,6 +316,29 @@ int main(int, char**) {
             ImGui::TextWrapped("%s", status.c_str());
             ImGui::TextWrapped("LocalState: %s", root_utf8.c_str());
             ImGui::TextUnformatted("Host log: gopher64-host.log");
+            bool picker_pending;
+            {
+                std::lock_guard<std::mutex> lock(picker->mutex);
+                picker_pending = picker->pending;
+                if (!picker->progress.empty()) {
+                    status = std::exchange(picker->progress, {});
+                    log(status);
+                }
+                if (picker->done) {
+                    picker->done = false;
+                    if (!picker->error.empty()) status = "ROM picker failed: " + picker->error;
+                    else if (picker->path.empty()) status = "No ROM selected. Select a ROM to try again.";
+                    else {
+                        rom = picker->path;
+                        autoboot = true;
+                        status = "ROM copied to temporary app storage; starting.";
+                    }
+                    log(status);
+                }
+            }
+            ImGui::BeginDisabled(picker_pending || autoboot);
+            if (ImGui::Button("Select ROM")) open_picker = true;
+            ImGui::EndDisabled();
             if (!probe_done && ImGui::Button("Test Rust entry (missing ROM)")) {
                 status = run_probe(root_path);
                 log(status);
@@ -263,6 +368,12 @@ int main(int, char**) {
                 log(status);
                 probe_done = true;
                 running = false;
+            }
+            if (open_picker && !first_frame && running) {
+                open_picker = false;
+                status = "Waiting for ROM selection...";
+                log("Opening ROM file picker");
+                choose_rom(picker);
             }
             if (autoboot && running) {
                 launch = true;

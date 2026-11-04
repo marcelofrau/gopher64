@@ -131,3 +131,44 @@ every interaction, including when a task is blocked or only a decision was made.
 
 Before committing, reran the eight Rust library tests, Rust formatting check, PowerShell script
 parsing, CRT import self-check, and `git diff --check`; all passed. Native compiler warnings remain.
+
+## 2026-11-04 — Visual Studio F5 observation and native ROM picker
+
+- The user ran Debug / x64 locally via VS 2026 after the CRT fix. Their debugger log shows the app,
+  SDL3 and Store Release CRT loading, `SDL renderer: direct3d11`, `Status screen initialized`, and
+  `First status frame presented`; their screenshot shows the minimal ImGui status screen. This
+  confirms the previously failing **PC F5** startup. It does not validate game rendering or Xbox.
+- The log also contained `Windows.Gaming.Input` HRESULTs `8685C003` and `80070057`, Game Bar
+  `80004005`, and injected Windhawk modules. The app nevertheless displayed its first frame. Their
+  causes and impact on gamepad behavior are unproven; do not dismiss or attribute them without tests.
+- The user requested an automatic ROM picker at startup on PC and asked to consult Ymir's original
+  UWP picker before its custom explorer. Ymir commit `512a00a5`,
+  `apps/ymir-sdl3/src/platform/uwp/uwp_platform.cpp`, uses WinRT `FileOpenPicker` on the UI thread
+  with asynchronous completion; it catches errors when setting a suggested start folder because
+  some locations are unavailable on Xbox. This host uses the same system picker via existing
+  C++/CX/PPL rather than Ymir's C++/WinRT coroutine, without forcing a start location. Ymir's
+  `docs/uwp/TESTING.md` also warns that receiving `StorageFile.Path` does not prove direct sandbox
+  access and recommends copying with WinRT if direct opening fails.
+- The first implementation opened a picker in an isolated PC test package; cancellation returned to
+  the status UI. The user's own PC F5 selection returned `Could not read ROM file`. Outside the app,
+  the selected file exists and its V64 header and size are valid. Because Rust discards the original
+  I/O error, a sandbox/path restriction is likely but not yet proved by an OS error code.
+- Implemented asynchronous `StorageFile.CopyAsync` into the app's `TemporaryFolder`, using a unique
+  name and never overwriting or modifying the source. The UI shows progress/error; cancellation
+  offers retry. The existing autoboot and missing-ROM test markers remain available. An interactive
+  PC test with a separately registered proof package selected a V64, copied it, read it through
+  Rust and reached `creating SDL Vulkan game window`; it then hit the expected WinRT Vulkan error
+  and restored the status UI. This proves selected-file reading in this PC test, not gameplay or
+  Xbox access. Temporary copies persist until Windows clears them, and UWP `recent_roms` may
+  contain temporary paths; the eventual library must handle this explicitly, preferably with
+  persistent brokered access rather than pretending temporary paths are durable. Existing save
+  filenames derive from the ROM header/hash, not the staging filename.
+- The host and MSIX compiled in both Debug and Release in an isolated build; both import audits
+  passed, while `APPX0006` and the Debug linker's `LNK4075` remain warnings. The actual VS Debug
+  host was also rebuilt. The missing-ROM probe was verified to bypass the new picker and exit as
+  expected. Its first temporary test incorrectly read the previous launch's appended log and
+  reported a false failure; restricting the check to the latest launch passed.
+- An isolated build directory is used while the user's VS instance is running. Do not terminate or
+  overwrite their running session for testing. Picker behavior and path access on Xbox remain
+  untested and must be tested by the user. Even after ROM loading, the known SDL WinRT Vulkan
+  blocker remains.
