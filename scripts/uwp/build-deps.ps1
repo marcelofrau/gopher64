@@ -20,6 +20,10 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+if ($Config -eq 'Debug') {
+    Write-Warning 'Debug SDL DLLs require the Debug VCLibs package; the current host manifest only includes Release VCLibs. Use Release dependencies for the host.'
+}
+
 # --- paths (all relative to repo root) --------------------------------------
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $sdlSrc   = Join-Path (Split-Path $repoRoot -Parent) "SDL3-uwp"   # ../SDL3-uwp
@@ -38,22 +42,27 @@ New-Item -ItemType Directory -Force -Path $out, $work | Out-Null
 $cmake = (Get-Command cmake -ErrorAction Stop).Source
 Write-Host "cmake: $cmake"
 
-# WindowsStore (UWP) builds require the Visual Studio generator (Ninja rejects -A/platform
-# specs and the WinRT toolchain). Pick the newest installed VS generator dynamically so no
-# VS version is hard-coded.
-$vsGen = (& $cmake --help | Select-String -Pattern '^\s+(Visual Studio \d+ \d+)' |
-    ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -First 1)
-if (-not $vsGen) { throw "No Visual Studio CMake generator found (needed for WindowsStore)." }
+# WindowsStore builds need a Visual Studio generator. Match the generator to an installed
+# instance instead of taking the first CMake entry (which may be an incomplete older install).
+. (Join-Path $PSScriptRoot 'common.ps1')
+$vs = Get-UwpVisualStudio
+$vsInstall = $vs.Install
+$vsGen = $vs.Generator
+$vsVersion = $vs.Version
+Write-Host "Visual Studio: $vsVersion ($vsInstall)"
 Write-Host "generator: $vsGen"
 
 # WindowsStore build args shared by SDL3 and SDL_ttf.
+$vsInstallFwd = $vsInstall -replace '\\', '/'
 $storeArgs = @(
     "-G", $vsGen,
     "-A", "x64",
+    "-DCMAKE_GENERATOR_INSTANCE=$vsInstallFwd",
     "-DCMAKE_SYSTEM_NAME=WindowsStore",
     "-DCMAKE_SYSTEM_VERSION=10.0",
     "-DBUILD_SHARED_LIBS=ON"
 )
+$vsBuildRoot = Join-Path $work "vs$vsVersion"
 
 function Invoke-CMakeBuild([string]$src, [string]$bld, [string[]]$extra) {
     & $cmake -S $src -B $bld @storeArgs @extra
@@ -65,8 +74,37 @@ function Invoke-CMakeBuild([string]$src, [string]$bld, [string[]]$extra) {
 }
 
 # --- SDL3 ---------------------------------------------------------------------
-Write-Host "==> Building SDL3-uwp (WindowsStore DLL)"
-Invoke-CMakeBuild $sdlSrc (Join-Path $work "SDL3") @(
+# Snapshot the clean sibling rather than editing it. The patch only handles the observed
+# WinRT PointerPosition AccessDenied failure; incompatible source revisions fail explicitly.
+$status = @(git -C $sdlSrc status --porcelain --untracked-files=normal)
+if ($LASTEXITCODE -ne 0) { throw "SDL3-uwp must be a Git checkout: $sdlSrc" }
+if ($status.Count -ne 0) { throw "SDL3-uwp has local changes; preserve them and use a clean checkout before building the patched snapshot." }
+$revision = (git -C $sdlSrc rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[0-9a-f]{40}$') { throw 'Cannot determine SDL3-uwp revision.' }
+$patch = Join-Path $PSScriptRoot 'SDL3-pointer-access.patch'
+$patchHash = (Get-FileHash $patch -Algorithm SHA256).Hash.Substring(0, 12).ToLowerInvariant()
+$sourceId = "$($revision.Substring(0, 12))-$patchHash-v2"
+$patchedSrc = Join-Path $work "SDL3-source-$sourceId"
+$patchDirectory = "out/uwp-deps-build/SDL3-source-$sourceId"
+$ready = Join-Path $patchedSrc '.gopher64-patch-applied'
+if (-not (Test-Path $ready)) {
+    if (Test-Path $patchedSrc) { throw "Incomplete SDL snapshot at $patchedSrc; inspect it or rebuild with -Clean." }
+    New-Item -ItemType Directory -Path $patchedSrc | Out-Null
+    $archive = Join-Path $work "SDL3-source-$sourceId.tar"
+    & git -C $sdlSrc archive "--output=$archive" HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'SDL3 source archive failed.' }
+    & tar -xf $archive -C $patchedSrc
+    if ($LASTEXITCODE -ne 0) { throw 'SDL3 source extraction failed.' }
+    & git -C $repoRoot apply --check "--directory=$patchDirectory" $patch
+    if ($LASTEXITCODE -ne 0) { throw 'SDL3 pointer patch does not match the sibling revision.' }
+    & git -C $repoRoot apply "--directory=$patchDirectory" $patch
+    if ($LASTEXITCODE -ne 0) { throw 'Could not apply SDL3 pointer patch.' }
+    & git -C $repoRoot apply --reverse --check "--directory=$patchDirectory" $patch
+    if ($LASTEXITCODE -ne 0) { throw 'SDL3 pointer patch verification failed.' }
+    Set-Content -LiteralPath $ready -Value "$revision $patchHash" -Encoding ascii
+}
+Write-Host "==> Building SDL3-uwp snapshot $sourceId (WindowsStore DLL)"
+Invoke-CMakeBuild $patchedSrc (Join-Path $vsBuildRoot "SDL3-$sourceId") @(
     "-DSDL_SHARED=ON", "-DSDL_STATIC=OFF", "-DSDL_TESTS=OFF", "-DSDL_EXAMPLES=OFF"
 )
 
@@ -78,7 +116,7 @@ if (-not (Test-Path $ttfSrc)) {
 }
 Write-Host "==> Building SDL_ttf (WindowsStore DLL, against out/uwp-deps SDL3)"
 # Build dir MUST differ from the source tree ($ttfSrc) — freetype refuses in-source builds.
-Invoke-CMakeBuild $ttfSrc (Join-Path $work "SDL_ttf-build") @(
+Invoke-CMakeBuild $ttfSrc (Join-Path $vsBuildRoot "SDL_ttf") @(
     "-DSDL3_DIR=$($out -replace '\\','/')/cmake",
     "-DSDLTTF_VENDORED=ON",
     "-DSDLTTF_HARFBUZZ=OFF", "-DSDLTTF_PLUTOSVG=OFF",

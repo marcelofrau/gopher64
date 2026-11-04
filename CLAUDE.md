@@ -16,6 +16,8 @@ The port's plan, decisions, risks and checklist live in `docs/xbox-port/`. Start
 `docs/xbox-port/00-upstream-fidelity-rules.md` is mandatory. It has the full rules plus a hook inventory you must keep up to date. The essentials:
 
 - **Branches.** `main` is a fast-forward-only mirror of `upstream/main`. Port work goes on `uwp/main` or on `uwp/<topic>` branches.
+- **Xbox access.** Never connect to, deploy to, or launch on the user's Xbox automatically. Only the user performs Xbox deployment or F5; agents test on PC and provide artifacts and instructions.
+- **Cross-machine handoff.** Read and append an English dated entry to `docs/xbox-port/memory-handoff.md` after every interaction, including results, failed attempts, tests, and pending work. Commit the agent's own changes in logical increments; leave unrelated user work untouched and do not push unless asked.
 - **Port-owned paths.** Put port code in `uwp/`, `scripts/uwp/`, `src/ui/uwp/`, `docs/xbox-port/` and `.github/workflows/uwp.yml`. `src/compat/` belongs to upstream; don't add files there.
 - **Upstream files get hooks only.** Each hook is a minimal change gated with `cfg(target_vendor = "uwp")`, `#ifdef GOPHER64_UWP`, or `CARGO_CFG_TARGET_VENDOR == "uwp"` in `build.rs`. It delegates to port-owned code and carries a `// UWP-PORT: <reason> (D-xx)` marker.
 - **Leave upstream code alone.** Never refactor, reformat, rename or reorder it. There is no `.clang-format` upstream, so never run clang-format on upstream C/C++.
@@ -51,21 +53,21 @@ cargo clippy --no-default-features -- -Dwarnings
 ./target/release/gopher64 /path/to/rom.z64     # run a ROM directly (CLI mode)
 ```
 
-- There is no test suite: the repository has no `#[test]` functions and no `tests/` directory. Validation is done by running ROMs. The reference games and the test matrix are in `docs/xbox-port/13-testing-debugging.md`.
+- `cargo test --lib --locked` includes ROM-loader and RDRAM/save-format regression tests. Real ROM validation is separate; the reference games and test matrix are in `docs/xbox-port/13-testing-debugging.md`.
 - `--no-default-features` builds without the slint GUI (CLI only). This is the configuration the UWP build uses.
 - Build requirements:
   - `clang`/`llvm`: `.cargo/config.toml` sets `CC=clang`, `CXX=clang++`, `AR=llvm-ar`. Windows CI uses `clang-cl` with an LLVM version matching rustc's.
   - libclang for `bindgen`.
   - git, because `build.rs` runs `git describe` and panics without it.
 - The toolchain is pinned by `rust-toolchain.toml` (currently 1.99.1).
-- UWP build (planned; see `docs/xbox-port/05-rust-uwp-toolchain.md`):
+- UWP staticlib build (see `docs/xbox-port/05-rust-uwp-toolchain.md`):
 
   ```bash
   RUSTC_BOOTSTRAP=1 cargo rustc --lib --release --crate-type staticlib \
     --target x86_64-uwp-windows-msvc --no-default-features -Zbuild-std=std,panic_abort
   ```
 
-  This needs `rustup component add rust-src` for the pinned toolchain. The final link and msix packaging are done by the CMake/MSBuild host in `uwp/` and the scripts in `scripts/uwp/` (not created yet).
+  This needs `rustup component add rust-src` for the pinned toolchain. The CMake/MSBuild host and PC build/package scripts exist; use `scripts/uwp/build-host.ps1` and see `docs/xbox-port/17-p2-implementation-handoff.md` for current results and remaining blockers.
 
 ## Architecture (big picture)
 

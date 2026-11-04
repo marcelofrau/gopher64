@@ -1,7 +1,7 @@
 use crate::device;
 use crate::retroachievements;
 use crate::ui;
-use std::alloc::{Layout, alloc_zeroed};
+use std::ops::{Deref, DerefMut};
 
 //const RDRAM_CONFIG_REG: usize = 0;
 //const RDRAM_DEVICE_ID_REG: usize = 1;
@@ -17,9 +17,126 @@ pub const RDRAM_REGS_COUNT: usize = 10;
 
 pub const RDRAM_MASK: usize = 0xFFFFFF;
 
+const RDRAM_ALIGNMENT: usize = 64 * 1024;
+
+#[derive(Default)]
+pub struct AlignedRdram {
+    storage: Vec<u8>,
+    offset: usize,
+    len: usize,
+}
+
+impl AlignedRdram {
+    fn zeroed(len: usize) -> Self {
+        if len == 0 {
+            return Self::default();
+        }
+        // Keep the original Vec allocation so it is freed with its original layout.
+        let storage = vec![
+            0;
+            len.checked_add(RDRAM_ALIGNMENT - 1)
+                .expect("RDRAM size overflow")
+        ];
+        let offset = storage.as_ptr().align_offset(RDRAM_ALIGNMENT);
+        Self {
+            storage,
+            offset,
+            len,
+        }
+    }
+}
+
+impl Deref for AlignedRdram {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.storage[self.offset..self.offset + self.len]
+    }
+}
+
+impl DerefMut for AlignedRdram {
+    fn deref_mut(&mut self) -> &mut [u8] {
+        &mut self.storage[self.offset..self.offset + self.len]
+    }
+}
+
+impl Clone for AlignedRdram {
+    fn clone(&self) -> Self {
+        let mut result = Self::zeroed(self.len);
+        result.copy_from_slice(self);
+        result
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        if self.len != source.len {
+            *self = Self::zeroed(source.len);
+        }
+        self.copy_from_slice(source);
+    }
+}
+
+impl serde::Serialize for AlignedRdram {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serde::Serialize::serialize(&**self, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AlignedRdram {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let bytes = <Vec<u8> as serde::Deserialize>::deserialize(deserializer)?;
+        let mut result = Self::zeroed(bytes.len());
+        result.copy_from_slice(&bytes);
+        Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod aligned_rdram_tests {
+    use super::*;
+
+    #[test]
+    fn allocation_clone_and_reuse_preserve_alignment_and_contents() {
+        for size in [0x400000, 0x800000] {
+            let mut original = AlignedRdram::zeroed(size);
+            assert_eq!(original.as_ptr() as usize % RDRAM_ALIGNMENT, 0);
+            assert!(original.iter().all(|byte| *byte == 0));
+            original[0] = 0x12;
+            original[size - 1] = 0x34;
+            let mut clone = original.clone();
+            assert_eq!(clone.as_ptr() as usize % RDRAM_ALIGNMENT, 0);
+            assert_eq!(&*clone, &*original);
+            let address = clone.as_ptr();
+            original[0] = 0x56;
+            clone.clone_from(&original);
+            assert_eq!(clone.as_ptr(), address);
+            assert_eq!(&*clone, &*original);
+        }
+    }
+
+    #[test]
+    fn previous_savestate_encoding_round_trips() {
+        #[derive(serde::Serialize)]
+        struct PreviousRdram {
+            mem: Vec<u8>,
+            size: u32,
+            regs: [[u32; RDRAM_REGS_COUNT]; 4],
+        }
+        let previous = PreviousRdram {
+            mem: (0..4096).map(|x| x as u8).collect(),
+            size: 4096,
+            regs: [[42; RDRAM_REGS_COUNT]; 4],
+        };
+        let bytes = postcard::to_stdvec(&previous).unwrap();
+        let decoded: Rdram = postcard::from_bytes(&bytes).unwrap();
+        assert_eq!(&*decoded.mem, previous.mem);
+        assert_eq!(decoded.mem.as_ptr() as usize % RDRAM_ALIGNMENT, 0);
+        assert_eq!(postcard::to_stdvec(&decoded).unwrap(), bytes);
+    }
+}
+
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Rdram {
-    pub mem: Vec<u8>,
+    pub mem: AlignedRdram,
     pub size: u32,
     pub regs: [[u32; RDRAM_REGS_COUNT]; 4],
 }
@@ -150,12 +267,7 @@ pub fn write_regs(device: &mut device::Device, address: u64, value: u32, mask: u
 }
 
 pub fn init(device: &mut device::Device) {
-    let alignment = 64 * 1024;
-    let layout =
-        Layout::from_size_align(device.rdram.size as usize, alignment).expect("Invalid layout");
-    let ptr = unsafe { alloc_zeroed(layout) };
-    device.rdram.mem =
-        unsafe { Vec::from_raw_parts(ptr, device.rdram.size as usize, device.rdram.size as usize) };
+    device.rdram.mem = AlignedRdram::zeroed(device.rdram.size as usize);
 
     retroachievements::set_rdram(device.rdram.mem.as_ptr(), device.rdram.size as usize);
 

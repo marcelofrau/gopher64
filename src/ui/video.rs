@@ -38,7 +38,7 @@ fn build_gfx_info(device: &mut device::Device, netplay: bool) -> GFX_INFO {
     }
 }
 
-pub fn init(device: &mut device::Device, netplay: bool) {
+pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
     ui::sdl_init(sdl3_sys::init::SDL_INIT_VIDEO);
     ui::ttf_init();
 
@@ -101,30 +101,47 @@ pub fn init(device: &mut device::Device, netplay: bool) {
         )
     };
 
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log("creating SDL Vulkan game window");
     device.ui.video.window = unsafe {
         sdl3_sys::video::SDL_CreateWindow(window_title.as_ptr(), window_width, window_height, flags)
     };
     if device.ui.video.window.is_null() {
         let err = sdl3_sys::error::SDL_GetError();
-        panic!(
+        let message = format!(
             "Could not create window: {}",
             if err.is_null() {
-                "Unknown error"
+                std::borrow::Cow::Borrowed("Unknown error")
             } else {
-                unsafe { std::ffi::CStr::from_ptr(err).to_str().unwrap() }
+                unsafe { std::ffi::CStr::from_ptr(err).to_string_lossy() }
             }
         );
+        #[cfg(target_vendor = "uwp")]
+        {
+            crate::ui::uwp::entry::log(&message);
+            return Err(std::io::Error::other(message));
+        }
+        #[cfg(not(target_vendor = "uwp"))]
+        panic!("{message}");
     }
     if !unsafe { sdl3_sys::video::SDL_ShowWindow(device.ui.video.window) } {
         let err = sdl3_sys::error::SDL_GetError();
-        panic!(
+        let message = format!(
             "Could not show window: {}",
             if err.is_null() {
-                "Unknown error"
+                std::borrow::Cow::Borrowed("Unknown error")
             } else {
-                unsafe { std::ffi::CStr::from_ptr(err).to_str().unwrap() }
+                unsafe { std::ffi::CStr::from_ptr(err).to_string_lossy() }
             }
         );
+        #[cfg(target_vendor = "uwp")]
+        {
+            unsafe { sdl3_sys::video::SDL_DestroyWindow(device.ui.video.window) };
+            device.ui.video.window = std::ptr::null_mut();
+            return Err(std::io::Error::other(message));
+        }
+        #[cfg(not(target_vendor = "uwp"))]
+        panic!("{message}");
     }
     unsafe {
         sdl3_sys::everything::SDL_HideCursor();
@@ -132,6 +149,8 @@ pub fn init(device: &mut device::Device, netplay: bool) {
 
     let gfx_info = build_gfx_info(device, netplay);
 
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log("entering rdp_init");
     unsafe {
         let font_bytes = include_bytes!("../../data/ui/RobotoMono-Regular.ttf");
         if !rdp_init(
@@ -141,11 +160,22 @@ pub fn init(device: &mut device::Device, netplay: bool) {
             font_bytes.len(),
             device.ui.storage.save_state_slot,
         ) {
+            #[cfg(target_vendor = "uwp")]
+            {
+                rdp_close();
+                sdl3_sys::video::SDL_DestroyWindow(device.ui.video.window);
+                device.ui.video.window = std::ptr::null_mut();
+                return Err(std::io::Error::other("Failed to init parallel-rdp"));
+            }
+            #[cfg(not(target_vendor = "uwp"))]
             panic!("Failed to init parallel-rdp.");
         }
     }
 
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log("rdp_init succeeded");
     fps_counter(&mut device.ui);
+    Ok(())
 }
 
 fn fps_counter(ui: &mut ui::Ui) {

@@ -144,7 +144,7 @@ Status: ✔ landed (P1 blocks 1–6) · ○ planned (P1 block 8 / P2+).
 | `build.rs` | `if uwp { … }` blocks: defines + `/FI` header on the C/C++ builds, skip `-flto`, skip winresource | D-14 | ~32 | ✔ |
 | `src/lib.rs` | `cfg` swap of `mod netplay` to the stub via `#[path]` (block 8 will add the UWP entry module) | D-09, D-02 | ~7 | ✔ |
 | `src/ui.rs` | `mod uwp` line; `get_dirs()` UWP delegation; `WEB_CLIENT` cfg widened | D-10, D-11, D-04 | ~10 | ✔ |
-| `src/ui/audio.rs` | none needed — SDL3 audio compiles on UWP as-is (block 7 dropped) | D-08 | 0 | ✔ |
+| `src/ui/audio.rs` | SDL3 audio compiles on UWP, but Xbox runtime compatibility is unproven; Ymir recorded a WASAPI deadlock. D-08 XAudio2 remains pending for P4; see [16](16-p2-host-frontend-plan.md) | D-08 | TBD | ○ |
 | `src/ui/video.rs` | inner `cfg_attr(uwp, allow(dead_code))` for netplay-only generated bindings (window flags: P2+) | D-14, D-09 | ~4 | ✔ |
 | `src/device/vi.rs` | `cfg`-gated call to `ui::uwp::time::precise_sleep` next to the untouched `spin_sleep::sleep` | 05 §4 | ~5 | ✔ |
 | `src/main.rs` | none (desktop only) | — | 0 | — |
@@ -157,6 +157,17 @@ Status: ✔ landed (P1 blocks 1–6) · ○ planned (P1 block 8 / P2+).
 | **Total (landed, P1 b1–6)** | **8 upstream files** | | **~130** | |
 
 Port-owned files added: `scripts/uwp/build-deps.ps1`, `scripts/uwp/gen-links.ps1`, `uwp/compat/g64_uwp_compat.h`, `src/ui/uwp/{mod,time,netplay_stub}.rs`.
+
+### P2 fidelity deviations requiring review before commit
+
+The current working tree is **not R3/R4/R5-clean**. The P2 investigation found faults that cannot honestly be described as cfg-only hooks. Do not silently mark the fidelity checklist complete:
+
+- `src/device/rdram.rs` and `src/device.rs`: shared RDRAM ownership was changed after a symbolized UWP heap failure proved the original 64-KiB allocation was released using the wrong `Vec<u8>` layout. Tests compare legacy postcard bytes and check alignment; desktop Vulkan startup was smoke-tested, but gameplay and real save/load remain unverified. This is an upstream-fix candidate.
+- `src/device.rs`: shared ROM/ZIP/7z reading returns an error instead of panicking on missing, short or malformed input; this intentionally changes desktop/Android failure behavior. `src/ui/config.rs` also reports save failures previously ignored. Valid raw/ZIP/7z inputs have unit tests; Android execution remains unverified.
+- `src/ui/video.rs`, `src/device.rs`, and `src/lib.rs`: video initialization now propagates an error and UWP cleanup/diagnostics have inline cfg gates rather than only a single delegated hook. Desktop success behavior was smoke-tested; this needs explicit fidelity review and possible upstreaming.
+- `scripts/uwp/SDL3-pointer-access.patch`: a local source patch is applied to an isolated generated SDL snapshot, not to the sibling repository or a submodule. This conflicts with R4's preferred SDL-fork-only approach and must be reviewed/upstreamed to the SDL fork rather than mistaken for a permanent exemption.
+
+These are documented exceptions under review, not a change to the project rules. See [17](17-p2-implementation-handoff.md) for reproduction and remaining validation.
 
 ## PR / commit checklist for `uwp/main`
 

@@ -41,6 +41,8 @@ stateDiagram-v2
 
 ### 2.2 P5: gamepad shell (ImGui, in the host)
 
+> **P2 refinement:** the minimal C++/ImGui status screen starts in P2; the full shell remains P5. The same-window hand-over below is a hypothesis, not a validated implementation. See [16](16-p2-host-frontend-plan.md) for the current integration evidence and open decisions.
+
 | Aspect | Design |
 |--------|--------|
 | Toolkit | Dear ImGui (docking branch not needed) with `imgui_impl_sdl3` + `imgui_impl_sdlrenderer3` on SDL3-uwp's WinRT D3D11 renderer |

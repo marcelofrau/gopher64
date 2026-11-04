@@ -1,5 +1,7 @@
 # 02 — Architecture
 
+> Xbox access is user-only: agents must not connect, deploy, launch, or retrieve data from the console. The user performs deployment and F5 manually. See [17](17-p2-implementation-handoff.md) for current implementation status.
+
 This document describes the target architecture of the UWP build. The guiding principle is **wrap, don't fork**: the emulator core, parallel-rdp and almost all of gopher64's Rust code compile unchanged. A thin C++ host owns the UWP entry point, and a few `cfg(target_vendor = "uwp")` branches replace desktop-only platform code.
 
 ## 1. Component view
@@ -111,12 +113,12 @@ flowchart LR
         C1 --> M1[("AppxManifest + Assets<br/>VS_DEPLOYMENT_CONTENT DLLs")]
     end
 
-    subgraph S4["4 · package.ps1 / deploy-xbox.ps1"]
+    subgraph S4["4 · package and user-controlled deployment"]
         X1 --> D1["MSBuild AppxPackage<br/>→ .msix + VCLibs dep"]
         M1 --> D1
         D1 --> D2["signtool (self-signed .pfx)"]
         D2 --> D3["zip: msix + cer +<br/>Dependencies + Install.ps1"]
-        D2 --> D4["Device Portal REST<br/>:11443 install + launch"]
+        D2 --> D4["User manually deploys<br/>or launches via VS F5"]
     end
 ```
 
@@ -250,7 +252,7 @@ gopher64/
 │     ├─ uwp_platform.{hpp,cpp}  log redirect, root probe, UI helpers
 │     ├─ xaudio2_backend.{hpp,cpp}  C ABI used by src/ui/audio.rs
 │     └─ launcher/            (P5) ImGui shell, file browser
-├─ scripts/uwp/               ← NEW: build-deps, build, package, deploy-xbox (from Ymir)
+├─ scripts/uwp/               ← build, PC install, audit and VS-opening helpers; no automatic Xbox access
 │  └─ xbox.env.example
 ├─ .cargo/config.toml         ← + [target.x86_64-uwp-windows-msvc] section & links overrides
 ├─ .github/workflows/uwp.yml  ← NEW (fork only)

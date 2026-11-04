@@ -1,5 +1,7 @@
 # 08 — Packaging & Deployment
 
+> **Xbox access rule:** only the user deploys or launches on Xbox, manually or via VS F5. Agents must not connect to the console. This document contains historical planning; the current PC workflow and actual artifacts are in [17](17-p2-implementation-handoff.md).
+
 ## 1. Pipeline overview
 
 ```mermaid
@@ -7,8 +9,8 @@ flowchart LR
     subgraph DEV["Developer PC"]
         BD["scripts/uwp/build-deps.ps1<br/>SDL3-uwp · SDL3_ttf · Mesa dzn"] --> B["scripts/uwp/build.ps1<br/>cargo staticlib + CMake host"]
         B --> AU["scripts/uwp/audit-imports.ps1<br/>dumpbin /imports gate"]
-        AU --> PK["scripts/uwp/package.ps1<br/>msix + sign + zip"]
-        PK --> DP["scripts/uwp/deploy-xbox.ps1<br/>Device Portal REST"]
+        AU --> PK["MSIX package<br/>development signing"]
+        PK --> DP["User performs deployment<br/>manually or via VS F5"]
     end
     subgraph CI["GitHub Actions (windows-2025)"]
         T["tag uwp-vX.Y.Z.R"] --> CB["same scripts, cached deps"] --> REL["Release: zip<br/>(msix + cer + Dependencies + Install.ps1)"]
@@ -121,24 +123,9 @@ Notes:
 
 On the console: Device Portal → Certificates → install the `.cer` once (or rely on Dev Mode's sideload trust). On a PC: import the `.cer` into `LocalMachine\Root` and `LocalMachine\TrustedPeople` (error `0x800B0109` otherwise).
 
-## 6. Deploy (Device Portal REST)
+## 6. Xbox deployment — user only
 
-`scripts/uwp/deploy-xbox.ps1` (from Ymir), config in `scripts/uwp/xbox.env` (git-ignored; template `xbox.env.example`: `XBOX_IP`, `XBOX_USER`, `XBOX_PASS`).
-
-```mermaid
-sequenceDiagram
-    participant S as deploy-xbox.ps1
-    participant P as Device Portal (https://XBOX_IP:11443)
-    S->>P: GET /api/os/info (basic auth) → CSRF-Token cookie
-    S->>P: POST /api/app/packagemanager/package?package=<msix> (multipart: msix + VCLibs deps), X-CSRF-Token
-    loop until done
-        S->>P: GET /api/app/packagemanager/state
-    end
-    S->>P: GET /api/app/packagemanager/packages → find PackageFullName / PRAID
-    S->>P: POST /api/taskmanager/app?appid=<appId>&package=<full name>  (-Launch; encoding as in Ymir deploy-xbox.ps1:116)
-```
-
-Additional scripts (from dosbox-pure-uwp / x-files-uwp / Ymir sets): `status.ps1`, `logs.ps1` (download `LocalState\gopher64.log` through the Device Portal app-data file API — exact endpoint and parameters as documented in x-files-uwp `docs/PORTAL-APPDATA.md`), `clean.ps1`, `loopback-exempt.ps1`.
+The user chooses how to install the generated MSIX and matching VCLibs on the Xbox, or initiates F5 in Visual Studio. Agents do not connect to Device Portal or issue install, launch, status, log-retrieval, or other requests to the console. No automated Xbox deployment script is provided.
 
 ## 7. Distribution zip
 

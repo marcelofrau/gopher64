@@ -3,7 +3,33 @@
 
 use crate::{Args, create_runtime, run};
 use clap::Parser;
-use std::ffi::{CStr, c_char, c_int};
+use std::ffi::{CStr, CString, c_char, c_int};
+use std::sync::RwLock;
+
+type LogCallback = unsafe extern "C" fn(*const c_char);
+static LOG_CALLBACK: RwLock<Option<LogCallback>> = RwLock::new(None);
+
+pub(crate) fn log(message: &str) {
+    eprintln!("[rust] {message}");
+    let callback = *LOG_CALLBACK
+        .read()
+        .unwrap_or_else(|error| error.into_inner());
+    if let Some(callback) = callback {
+        let sanitized = message.replace('\0', "\\0");
+        if let Ok(message) = CString::new(sanitized) {
+            unsafe { callback(message.as_ptr()) };
+        }
+    }
+}
+
+/// Register a host callback that copies each message before returning.
+/// Pass null to unregister it before destroying host logging state.
+#[unsafe(no_mangle)]
+pub extern "C" fn gopher64_uwp_set_log_callback(callback: Option<LogCallback>) {
+    *LOG_CALLBACK
+        .write()
+        .unwrap_or_else(|error| error.into_inner()) = callback;
+}
 
 fn argv_to_strings(argc: c_int, argv: *mut *mut c_char) -> Vec<String> {
     if argc <= 0 || argv.is_null() {
@@ -20,7 +46,7 @@ fn argv_to_strings(argc: c_int, argv: *mut *mut c_char) -> Vec<String> {
 /// `panic = "abort"` on UWP there is no unwinding, so this is the only chance to record it.
 fn install_panic_hook() {
     std::panic::set_hook(Box::new(|info| {
-        eprintln!("[rust] panic: {info}");
+        log(&format!("panic: {info}"));
     }));
 }
 
@@ -48,6 +74,7 @@ pub unsafe extern "C" fn gopher64_uwp_set_root(root: *const c_char) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gopher64_uwp_main(argc: c_int, argv: *mut *mut c_char) -> c_int {
     install_panic_hook();
+    log("entry started");
 
     let (close_tx, handle) = create_runtime();
     let _guard = handle.enter();
@@ -56,18 +83,21 @@ pub unsafe extern "C" fn gopher64_uwp_main(argc: c_int, argv: *mut *mut c_char) 
     let args = match Args::try_parse_from(raw) {
         Ok(args) => args,
         Err(err) => {
-            eprintln!("[rust] failed to parse arguments: {err}");
+            log(&format!("failed to parse arguments: {err}"));
             let _ = close_tx.send(());
             return 1;
         }
     };
 
-    if let Err(err) = run(args, argc as usize) {
+    let result = run(args, argc as usize);
+    log("run returned; stopping runtime");
+    if let Err(err) = result {
         let _ = close_tx.send(());
-        eprintln!("[rust] error running game: {err:?}");
+        log(&format!("error running game: {err}"));
         return 1;
     }
 
     let _ = close_tx.send(());
+    log("entry returned successfully");
     0
 }

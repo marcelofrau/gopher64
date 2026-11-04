@@ -1,5 +1,9 @@
 # P0 handoff — 2026-10-30
 
+> Historical status: this records the P0 state on 2026-10-30. P1 UWP Rust code and
+> a local staticlib build workflow have since been added; see [15](15-local-build-debug-workflow-plan.md).
+> The checkpoint path mentioned in older notes is absent from the current checkout.
+
 ## Resume here
 
 **Four-game desktop matrix validated (`uwp-v0.0.2`).** The user confirmed correct

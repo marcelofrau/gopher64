@@ -263,7 +263,7 @@ pub fn run(args: Args, arg_count: usize) -> std::io::Result<()> {
             None
         };
 
-        device::run_game(
+        let game_result = device::run_game(
             &mut device,
             &rom_contents,
             ui::GameSettings {
@@ -276,6 +276,10 @@ pub fn run(args: Args, arg_count: usize) -> std::io::Result<()> {
             netplay_config,
         );
 
+        #[cfg(target_vendor = "uwp")]
+        if game_result.is_err() {
+            crate::ui::uwp::entry::log("game initialization failed; shutting down services");
+        }
         // on Android, the client is shut down in the app_window function
         #[cfg(not(target_os = "android"))]
         retroachievements::shutdown_client();
@@ -296,6 +300,14 @@ pub fn run(args: Args, arg_count: usize) -> std::io::Result<()> {
         }
 
         ui::usb::close(shutdown_tx, usb_handle);
+        if let Err(error) = game_result {
+            #[cfg(target_vendor = "uwp")]
+            crate::ui::uwp::entry::log("shutting down SDL after game initialization failure");
+            ui::sdl_close();
+            #[cfg(target_vendor = "uwp")]
+            crate::ui::uwp::entry::log("SDL shutdown completed after game initialization failure");
+            return Err(error);
+        }
     } else if arg_count > 1 {
         let mut config = ui::config::Config::new();
 

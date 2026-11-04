@@ -1,0 +1,24 @@
+diff --git a/src/video/winrt/SDL_winrtvideo.cpp b/src/video/winrt/SDL_winrtvideo.cpp
+--- a/src/video/winrt/SDL_winrtvideo.cpp
++++ b/src/video/winrt/SDL_winrtvideo.cpp
+@@ -807,8 +807,18 @@ WINRT_DetectWindowFlags(SDL_Window *window)
+         // data->coreWindow->PointerPosition is not supported on WinPhone 8.0
+         latestFlags |= SDL_WINDOW_MOUSE_FOCUS;
+ #else
+-        if (data->coreWindow->Visible && data->coreWindow->Bounds.Contains(data->coreWindow->PointerPosition)) {
+-            latestFlags |= SDL_WINDOW_MOUSE_FOCUS;
++        try {
++            if (data->coreWindow->Visible && data->coreWindow->Bounds.Contains(data->coreWindow->PointerPosition)) {
++                latestFlags |= SDL_WINDOW_MOUSE_FOCUS;
++            }
++        } catch (Platform::AccessDeniedException^) {
++            // Pointer enter/exit events still update focus when the OS denies this query.
++            latestFlags |= window->flags & SDL_WINDOW_MOUSE_FOCUS;
++            static bool reported = false;
++            if (!reported) {
++                SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO, "WinRT pointer position unavailable; retaining mouse focus");
++                reported = true;
++            }
+         }
+ #endif
+     }

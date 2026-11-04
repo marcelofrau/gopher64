@@ -78,6 +78,9 @@ Small, generic changes that would reduce our diff if upstream accepted them:
 2. A `precise_sleep` abstraction instead of calling `spin_sleep` directly (also useful for future platforms).
 3. Optional loader override hook in `interface.cpp` (generalises the Android adrenotools path).
 4. `get_dirs()` override via an env var / API for embedders.
+5. Correct the RDRAM aligned-allocation ownership and preserve the existing savestate representation; see the P2 CDB evidence and tests in [17](17-p2-implementation-handoff.md).
+6. Return recoverable errors for unreadable/malformed ROM archives and configuration-save failures, with valid-format regression tests.
+7. Propose the WinRT `PointerPosition` access-denied handling to the SDL3-uwp fork; the temporary generated-source patch is an R4 deviation, not an accepted permanent architecture.
 
 Propose them only after the port works, with the Xbox port as the motivating use case.
 

@@ -97,10 +97,8 @@ impl Drop for Cheats {
 fn write_cheats(cheats: &Cheats) {
     let dirs = ui::get_dirs();
     let file_path = dirs.config_dir.join("cheats.json");
-    if let Ok(f) = std::fs::File::create(file_path)
-        && let Err(e) = serde_json::to_writer_pretty(f, &cheats)
-    {
-        eprintln!("Error writing cheats: {}", e);
+    if let Err(error) = write_json(&file_path, cheats) {
+        report_write_error("cheats", &error);
     }
 }
 
@@ -132,10 +130,31 @@ impl Drop for Config {
 fn write_config(config: &Config) {
     let dirs = ui::get_dirs();
     let file_path = dirs.config_dir.join("config.json");
-    if let Ok(f) = std::fs::File::create(file_path)
-        && let Err(e) = serde_json::to_writer_pretty(f, &config)
-    {
-        eprintln!("Error writing config: {}", e);
+    if let Err(error) = write_json(&file_path, config) {
+        report_write_error("config", &error);
+    }
+}
+
+fn write_json(path: &std::path::Path, value: &impl serde::Serialize) -> std::io::Result<()> {
+    let file = std::fs::File::create(path)?;
+    serde_json::to_writer_pretty(file, value).map_err(std::io::Error::other)
+}
+
+fn report_write_error(kind: &str, error: &std::io::Error) {
+    #[cfg(target_vendor = "uwp")]
+    crate::ui::uwp::entry::log(&format!("Error writing {kind}: {error}"));
+    #[cfg(not(target_vendor = "uwp"))]
+    eprintln!("Error writing {kind}: {error}");
+}
+
+#[cfg(test)]
+mod write_tests {
+    #[test]
+    fn reports_file_creation_errors() {
+        let parent = std::env::temp_dir().join(format!("gopher64-missing-{}", std::process::id()));
+        let error =
+            super::write_json(&parent.join("missing").join("config.json"), &42).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
     }
 }
 

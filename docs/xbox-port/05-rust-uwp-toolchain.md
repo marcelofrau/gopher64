@@ -30,12 +30,12 @@ Local toolchain inventory:
 
 | Component | Present | Notes |
 |-----------|---------|-------|
-| rustup 1.29.2, toolchains `1.99.1-msvc` (active, pinned by `rust-toolchain.toml`), `nightly-msvc`, `stable-msvc`, `stable-gnu` (default) | ✔ | Default toolchain is `-gnu`; the repo's `rust-toolchain.toml` overrides it to `1.99.1` MSVC |
+| rustup 1.29.2, toolchains `1.99.1-msvc` (pinned by `rust-toolchain.toml`), `nightly-msvc`, `stable-msvc`, `stable-gnu` (default) | ✔ | Use `rustup run 1.99.1 cargo`; standalone Cargo on PATH can select a different sysroot |
 | `rust-src` for `1.99.1` and nightly | ✔ | Installed 2026-10-28 for the spike |
-| VS 18 BuildTools, MSVC 14.51.36231, `lib/x64/store` (App CRT) | ✔ | Located with `vswhere -latest -products * -requires Microsoft.VisualStudio.Workload.UniversalBuildTools` (default install: `%ProgramFiles(x86)%\Microsoft Visual Studio\18\BuildTools`). Scripts must use `vswhere`, never a hard-coded path |
-| Windows SDK 10.0.26100 with `WindowsApp.lib`, `OneCoreUAP.lib` | ✔ | |
-| CMake 4.3.2 | ✔ | |
-| LLVM / clang-cl matching rustc's LLVM | ? | Needed for D-14; install via the same method as upstream CI (`.github/workflows/build.yml:112-131`) |
+| VS Community 2026 (18.11), MSVC 14.51.36231, UWP C++ component and Store CRT | ✔ | Located with `vswhere`; scripts must match the installed instance to the CMake generator, never hard-code paths |
+| Windows SDK 10.0.28000.0 | ✔ | Selected by the successful SDL UWP dependency build |
+| CMake 4.4.4 | ✔ | Generates `Visual Studio 18 2026` projects |
+| Rust LLVM 23.1.1 / clang-cl 23.1.4 | ✔ | Staticlib build completed with this LLVM pair |
 | Vulkan SDK (`vulkaninfo`) | ✘ | Needed for P0 only |
 | Python 3 + Meson deps for mesa-uwp | ? | Needed for P3 (mesa build) |
 
@@ -218,33 +218,37 @@ rdp_build.flag("/FIuwp/compat/g64_uwp_compat.h");
 
 Verification: the import audit ([§3](#3-final-link)) must show **no** `user32.dll`. `LoadLibraryA` may appear as an import from `api-ms-win-core-libraryloader-*`/`kernel32.dll`; it exists at runtime on the console (scummvm-uwp calls `LoadLibrary` under `runFullTrust`) but is never called by us (**Q-11**: confirm import resolves at load time on the console).
 
-## 8. Rust source changes (cfg map)
+## 8. Rust source status (2026-11-04)
 
-| File | Change | Lines (approx.) |
-|------|--------|-----------------|
-| `src/lib.rs` | `#[cfg(target_vendor = "uwp")] pub mod uwp;` exporting `gopher64_uwp_main(argc, argv)` and `gopher64_uwp_set_root(*const c_char)` (copy of `android::gopher64_sdl_main`, `src/ui/android.rs:195-211`) | +40 |
-| `src/ui.rs` | `get_dirs()` UWP branch; `WEB_CLIENT` builder: `cfg(any(android, uwp))` for webpki-roots; `sdl_hints()`: add `SDL_HINT_JOYSTICK_WGI=1`, `SDL_HINT_WINRT_HANDLE_BACK_BUTTON=1` on UWP | ~+25 |
-| `src/ui/audio.rs` | `#[cfg(target_vendor = "uwp")]` implementations calling `g64_audio_*` | ~+80 |
-| `src/ui/video.rs` | Window flags: no `SDL_WINDOW_VULKAN`, always fullscreen on UWP | ~+6 |
-| `src/device/vi.rs:223` | `#[cfg(target_vendor = "uwp")]` call to `crate::ui::uwp::time::precise_sleep(dur)`; the upstream `spin_sleep::sleep(dur)` line stays, gated `not(uwp)` (rule R3) | ~+3 (+ new 30-line module in `src/ui/uwp/time.rs`) |
-| `src/netplay.rs`, `src/ui/netplay.rs` | UWP stub module with identical public API | ~+40 |
-| `src/retroachievements.rs` | Discord functions → no-ops on UWP | ~+10 |
-| `src/ui/usb.rs` | No-op on UWP (or keep; default off) | ~+5 |
+| File | Current state |
+|------|---------------|
+| `src/ui/uwp/entry.rs` | C ABI entry/root functions and abort panic hook; both symbols verified in Debug/Release staticlibs |
+| `src/lib.rs` | Uses the UWP netplay stub while leaving the desktop implementation cfg-gated |
+| `src/ui.rs` | UWP `get_dirs()` branch is implemented; UWP webpki-roots and SDL WGI/back-button hints are still pending |
+| `src/device/vi.rs`, `src/ui/uwp/time.rs` | UWP `precise_sleep` path is implemented |
+| `src/ui/uwp/netplay_stub.rs` | UWP netplay stub is implemented and builds |
+| `src/ui/audio.rs`, `src/ui/video.rs` | UWP audio bridge and window-flag behavior are still pending |
+| RetroAchievements / USB | Dedicated UWP Discord/USB stubs remain pending or need an explicit audit |
+| `parallel-rdp/interface.cpp`, `wsi_platform.cpp` | Dozen loading and UWP surface integration remain pending |
 
-Total expected Rust diff: ~250 lines, almost all additive and `cfg`-isolated.
+See [10 — P1 checklist](10-roadmap-checklist.md#p1--gopher64-as-a-uwp-staticlib) for the full implementation and verification status. This replaces the original planned cfg map below for current progress; the design rationale above remains valid.
 
-## 9. Build command (what `scripts/uwp/build.ps1` will run)
+Original planning estimate: ~250 Rust lines, mostly additive and `cfg`-isolated; see the P1 checklist for what is implemented versus still pending.
+
+## 9. Build command
+
+Use the scripts below instead of the earlier spike one-liners: this machine's standalone `cargo` on PATH is not the rustup proxy, so `cargo +toolchain` is not reliable here.
 
 ```powershell
-$env:RUSTC_BOOTSTRAP = "1"
-cargo rustc --lib --release `
-    --crate-type staticlib `
-    --target x86_64-uwp-windows-msvc `
-    --no-default-features `
-    -Z build-std=std,panic_abort `
-    --config "profile.release.panic='abort'" `
-    --config .cargo/uwp-links.toml          # generated: SDL3 / SDL3_ttf overrides
-# → target/x86_64-uwp-windows-msvc/release/gopher64.lib
+# Full P1 build (initializes only required Rust submodules when explicitly requested)
+pwsh -NoProfile -File scripts/uwp/build.ps1 -InitSubmodules
+
+# Reuse the SDL dependencies for an iterative Debug build
+pwsh -NoProfile -File scripts/uwp/build.ps1 -SkipDependencies -Configuration Debug
+# → target/x86_64-uwp-windows-msvc/{release|debug}/deps/gopher64.lib
+# The script also prints --print native-static-libs for the future host link.
 ```
 
 `panic = "abort"` on UWP: unwinding across the C++ host/SDL boundary is UB anyway, and it removes the need for `dbghelp`-backed unwinding at runtime. A panic hook writes the message to the log file before aborting.
+
+Local `--print native-static-libs` output includes `SDL3_ttf.lib SDL3.lib bcrypt.lib kernel32.lib ntdll.lib userenv.lib ws2_32.lib dbghelp.lib /defaultlib:msvcrt`. This records Rust's requirements only; it is not an app-container import audit or a successful host link. P2 must resolve the UWP Store CRT and API-set libraries in MSBuild.

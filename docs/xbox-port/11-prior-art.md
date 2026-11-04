@@ -93,7 +93,7 @@ The hub pages are static HTML (no JSON feed). Counts: emulators 21, frontends 3,
 | Source | Asset | Use in gopher64 |
 |--------|-------|-----------------|
 | **Ymir** (`uwp/main`, ~38 `uwp:` commits) | `docs/uwp/README.md` (D1–D24), `HANDOFF.md` (T-01…T-18), `TESTING.md` | Gotcha catalogue; read before P2 |
-| Ymir | `scripts/uwp/{common,build-deps,build,package,deploy-xbox,open-vs}.ps1`, `xbox.env.example` | Copy → `scripts/uwp/` |
+| Ymir | `scripts/uwp/{common,build-deps,build,package,deploy-xbox,open-vs}.ps1`, `xbox.env.example` | Reference selectively; no automated Xbox deployment or console access by agents. |
 | Ymir | `apps/ymir-sdl3/uwp/{UWPPackaging.cmake,Package.appxmanifest.in,ShellAssets.cmake,Assets/}` | Copy → `uwp/` |
 | Ymir | `apps/ymir-sdl3/src/platform/uwp/uwp_platform.cpp` (log redirect, `FindExternalProfilePath`, pickers, `UseFullCoreWindowBounds`), `stall_watchdog.cpp` | Copy/adapt → `uwp/src/uwp_platform.cpp` |
 | Ymir | `apps/ymir-sdl3/src/app/xaudio2_backend.cpp` (259 lines) | Adapt → `uwp/src/xaudio2_backend.cpp` |

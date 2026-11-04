@@ -1,10 +1,13 @@
 # Gopher64 on Xbox Series (Dev Mode / UWP) — Port Plan
 
-> **Status:** Planning — no code changes yet.
+> **Status:** P2 host and package build and run on PC; Xbox validation and `rdp_init` remain incomplete. See [the implementation handoff](17-p2-implementation-handoff.md) and [cross-machine work journal](memory-handoff.md).
 > **Plan date:** 2026-10-28
+> **Last local build verification:** 2026-11-04
 > **Upstream base:** `gopher64/gopher64@87385e7` (v1.1.42)
 > **Fork:** `marcelofrau/gopher64`
 > **Target:** Xbox Series X|S in Developer Mode, packaged as a UWP `.msix`.
+>
+> **Xbox access rule:** agents must not connect to, deploy to, or launch on the user's Xbox. Only the user performs Xbox deployment or VS F5; agent tests run on PC.
 
 This folder is the single source of truth for the Xbox port. It records **what** we are going to build, **why** each decision was made, **what can go wrong**, and **the checklist we follow**. Every document is meant to be updated as work progresses — when a decision changes, edit the decision record and leave a dated note rather than silently rewriting history.
 
@@ -14,12 +17,12 @@ This folder is the single source of truth for the Xbox port. It records **what**
 
 Gopher64 is a Rust N64 emulator with a C++ Vulkan renderer (parallel-rdp). Xbox Dev Mode only allows UWP apps (CoreWindow, AppContainer, D3D11/D3D12 only — **no native Vulkan driver**). The plan is:
 
-1. **Keep the emulator core untouched.** It is a pure interpreter (no JIT, no `mmap`/`VirtualAlloc`), so it has no UWP-hostile code.
+1. **Preserve the emulator core where possible.** It is a pure interpreter (no JIT, no `mmap`/`VirtualAlloc`). Shared ROM validation and RDRAM alignment fixes were needed during P2 and are documented fidelity exceptions awaiting review ([00](00-upstream-fidelity-rules.md)).
 2. **Compile the Rust crate as a static library** for the Tier-3 target `x86_64-uwp-windows-msvc` (upstream's pinned rustc + `RUSTC_BOOTSTRAP=1` + `-Z build-std`), with `--no-default-features` (drops slint/winit/wgpu/rfd/open).
 3. **Host it in a thin C++20 UWP executable** that uses SDL3-uwp's `SDL_main` (same pattern as our Ymir port) and calls into Rust through a C ABI entry point (modelled on the existing Android `gopher64_sdl_main`).
 4. **Run Vulkan through Mesa Dozen** (Vulkan → D3D12, `vulkan_dzn.dll` from our `mesa-uwp` fork), loaded directly with `LoadPackagedLibrary`, bypassing the Khronos loader. parallel-rdp requires Vulkan 1.1, compute, a swapchain and 8/16-bit storage buffer access ([04 §2](04-vulkan-dozen.md#2-what-parallel-rdp--granite-actually-require)). Dozen-on-Xbox is already proven by shipped projects (OnyxEMU, rpcs3-xbox, gow3_xbox, WWHD-UWP — October 2026); we adopt their Xbox-specific Mesa fixes (write-combined memory, DXIL self-signing, PSO cache).
 5. **Replace the few SDL subsystems that are broken on Xbox**: audio → XAudio2 (SDL WASAPI deadlocks on Xbox), Vulkan surface → custom Granite `WSIPlatform`, paths → LocalState / external drive.
-6. **Package, sign and deploy** with the scripts we already proved on Ymir, dosbox-pure and scummvm.
+6. **Package and sign** using patterns evaluated from Ymir and other sibling ports. The user alone deploys to or launches on Xbox; no console deploy script is provided.
 7. **De-risk first**: Phase 0 validates parallel-rdp on Dozen **on a Windows PC** before any Xbox work.
 
 ```mermaid
@@ -60,6 +63,10 @@ flowchart LR
 | 11 | [Prior art](11-prior-art.md) | What the workspace ports and the Xbox homebrew scene already solved |
 | 12 | [Upstream sync & branching](12-upstream-sync.md) | How we stay mergeable with `gopher64/gopher64` |
 | 13 | [Testing & debugging](13-testing-debugging.md) | Test matrix, logging, diagnostics, performance metrics |
+| 14 | [P0 handoff](14-p0-handoff.md) | Historical P0 validation and handoff notes |
+| 15 | [Local build/debug workflow](15-local-build-debug-workflow-plan.md) | P1 scripts, build evidence, and P2 VS/Xbox work still pending |
+| 16 | [P2 host/frontend plan](16-p2-host-frontend-plan.md) | Integration evidence, C++/ImGui direction, open risks and staged checks |
+| 17 | [P2 implementation handoff](17-p2-implementation-handoff.md) | PC build/runtime evidence, scripts, diagnosed failures and unverified Xbox work |
 
 ---
 
@@ -90,9 +97,10 @@ flowchart LR
 | Dozen UWP WSI | `VK_KHR_win32_surface` → `CreateSwapChainForCoreWindow`, extent from HDMI mode | `mesa-uwp/src/vulkan/wsi/wsi_common_win32.cpp:210,925` |
 | Dozen DLL exports | `vk_icdGetInstanceProcAddr`, `vk_icdGetPhysicalDeviceProcAddr`, `vk_icdNegotiateLoaderICDInterfaceVersion`; App CRT | `dumpbin` of RetroArch's bundled `vulkan_dzn.dll` |
 | SDL3-uwp | No Vulkan in the WinRT video driver; `SDL_WINDOW_VULKAN` makes `SDL_CreateWindow` fail | `SDL3-uwp/src/video/SDL_video.c:2678` |
-| Rust UWP | `x86_64-uwp-windows-msvc` staticlib builds with nightly + `-Zbuild-std=std,panic_abort` (~50 s) | Spike, 2026-10-28 |
-| Toolchain on this PC | VS 18 BuildTools (MSVC 14.51, `lib/x64/store`), SDK 10.0.26100 (`WindowsApp.lib`), nightly + 1.99.1 with `rust-src` | Local check, 2026-10-28 |
-| Rust UWP on upstream toolchain | `RUSTC_BOOTSTRAP=1 cargo +1.99.1 build -Zbuild-std=std,panic_abort --target x86_64-uwp-windows-msvc` ✔ (39 s) | Spike, 2026-10-28 |
+| Rust UWP | Release and Debug staticlibs build for `x86_64-uwp-windows-msvc`; C ABI symbols verified | [15](15-local-build-debug-workflow-plan.md) |
+| Toolchain on this PC | VS Community 2026 (18.11), MSVC 14.51, SDK 10.0.28000, CMake 4.4.4; Rust LLVM 23.1.1 + clang-cl 23.1.4 | Local verification, 2026-11-04 |
+| Rust UWP build command | `pwsh -NoProfile -File scripts/uwp/build.ps1`; output at `target/x86_64-uwp-windows-msvc/release/deps/gopher64.lib` | [15](15-local-build-debug-workflow-plan.md) |
+| Native static libraries | VS host links in Debug and Release; final imported APIs, dynamic loads and Xbox availability still require validation | [17](17-p2-implementation-handoff.md) |
 | Dozen on Xbox in the wild | ≥ 5 shipped projects since 2026-10-04 (OnyxEMU first); none is an N64 / parallel-rdp user | [11](11-prior-art.md) |
 | Xbox Dozen pitfalls | CPU writes via WRITE_BACK mappings invisible to GPU; Series S DXIL validator rejects Dozen shaders; PSO compile 0.4–0.7 s | OnyxEMU Mesa patches `0014`, `0008`/`0016`, `0017` |
 | Desktop-only APIs in Granite/volk | `LoadLibraryA` (`volk.c:87`, `context.cpp:249`), `MessageBoxA` (`breadcrumbs.cpp:709`) | grep of the 44 compiled files |

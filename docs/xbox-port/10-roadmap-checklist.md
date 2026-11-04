@@ -79,42 +79,48 @@ original two-mode criterion passed. Intel and Xbox validation remain separate.
 
 **Goal:** `gopher64.lib` for `x86_64-uwp-windows-msvc` with a clean import audit.
 
-- [ ] `rustup component add rust-src` for the pinned toolchain (✔ done for 1.99.1 on this PC)
-- [ ] Install LLVM/clang-cl matching rustc's LLVM major; verify `clang-cl --version`
-- [ ] `scripts/uwp/build-deps.ps1`: SDL3-uwp (DLL) → `out/uwp-deps`; SDL3_ttf 3.2.x (DLL) against it
-- [ ] Generate `.cargo/uwp-links.toml` with `links` overrides for `SDL3` and `SDL3_ttf` (D-05)
-- [ ] `Cargo.toml`: target-specific dependency tables ([05 §5](05-rust-uwp-toolchain.md#5-planned-cargotoml-changes))
-- [ ] `.cargo/config.toml`: `[target.x86_64-uwp-windows-msvc]` + `CC/CXX/AR_x86_64_uwp_windows_msvc`
-- [ ] `build.rs`: `uwp` block (defines, no `-flto=thin`, no winresource, `/FI` compat header) ([05 §7](05-rust-uwp-toolchain.md#7-planned-buildrs-changes))
-- [ ] `uwp/compat/g64_uwp_compat.h` (`LoadLibraryA` decl, `MessageBoxA` → stderr)
-- [ ] `src/lib.rs`: `uwp` module with `gopher64_uwp_main`, `gopher64_uwp_set_root`, panic hook
-- [ ] `src/ui.rs`: `get_dirs()` UWP branch; `WEB_CLIENT` webpki-roots branch; WGI + back-button hints
-- [ ] `src/ui/uwp/time.rs` (`precise_sleep`) and cfg-gated hook at `src/device/vi.rs:223`
-- [ ] Netplay / Discord / USB stubs on UWP
+- [x] `rustup component add rust-src` for the pinned toolchain; the build script verifies the exact rust-src files
+- [x] LLVM/clang-cl available and validated by the successful build (Rust LLVM 23.1.1; clang-cl 23.1.4)
+- [x] `scripts/uwp/build-deps.ps1`: SDL3-uwp and SDL3_ttf build into `out/uwp-deps`
+- [x] Generate `.cargo/uwp-links.toml` with `links` overrides for `SDL3` and `SDL3_ttf` (D-05)
+- [x] `Cargo.toml`: target-specific dependency tables ([05 §5](05-rust-uwp-toolchain.md#5-planned-cargotoml-changes))
+- [x] `.cargo/config.toml`: UWP target plus `CC/CXX/AR_x86_64_uwp_windows_msvc`
+- [x] `build.rs`: UWP defines, no `-flto=thin`/winresource, `/FI` compat header ([05 §7](05-rust-uwp-toolchain.md#7-planned-buildrs-changes))
+- [x] `uwp/compat/g64_uwp_compat.h` (`LoadLibraryA` decl, `MessageBoxA` → stderr)
+- [x] `src/ui/uwp/entry.rs`: C ABI entry/root functions and abort panic hook; both symbols verified in Debug/Release archives
+- [x] `src/ui.rs`: UWP `get_dirs()` branch
+- [ ] `WEB_CLIENT` webpki-roots branch and WGI/back-button hints
+- [x] `src/ui/uwp/time.rs` (`precise_sleep`) and cfg-gated hook at `src/device/vi.rs:223`
+- [x] Netplay stub compiles for UWP
+- [ ] Discord / USB UWP stubs
 - [ ] `src/ui/audio.rs`: UWP branch calling `g64_audio_*` (stubs OK for P1)
 - [ ] `src/ui/video.rs`: UWP window flags
 - [ ] `parallel-rdp/interface.cpp`: `g64_load_dozen()` + guard Android suspend teardown; `wsi_platform.cpp`: UWP surface
-- [ ] Build: `cargo rustc --lib --release --crate-type staticlib --target x86_64-uwp-windows-msvc --no-default-features -Zbuild-std=std,panic_abort`
-- [ ] Desktop build still compiles and runs unchanged (`cargo build --release`, `cargo clippy --no-default-features`)
-- [ ] Record `--print native-static-libs`
+- [x] Release and Debug staticlibs build through `scripts/uwp/build.ps1`
+- [x] Desktop Release compiles (`rustup run 1.99.1 cargo build --release --locked`)
+- [ ] Desktop runtime smoke test and `cargo clippy --no-default-features`
+- [x] Record `--print native-static-libs`; Store CRT/API-set resolution remains unverified
 
-**Exit criteria:** staticlib builds from a clean checkout via `scripts/uwp/build.ps1`; desktop build unaffected; diff is `cfg`-isolated.
+**Current evidence:** local Release/Debug staticlibs and desktop Release build pass. **P1 remains open** for a clean-checkout run, the clean import audit, and resolving the native libraries in an actual UWP host link. No Xbox app has been packaged or run.
 
 ---
 
 <a id="p2"></a>
 ## P2 — Host shim, packaging, boot on console
 
+> **P2 integration refinement:** [16 — P2 host/frontend plan](16-p2-host-frontend-plan.md) records the source review, C++/ImGui status-screen direction, risks and staged checks. Where this historical checklist assumes an untested mechanism, use the evidence-based plan; the original exit target remains below and is not silently relaxed.
+> **Implementation evidence and current blockers:** [17 — P2 implementation handoff](17-p2-implementation-handoff.md). P2 remains open.
+
 **Goal:** the msix installs and launches from the tile; the log shows gopher64 initialising.
 
-- [ ] Read Ymir `docs/uwp/HANDOFF.md` (T-01…T-18) and scummvm-uwp `docs/XBOX-TILE-LAUNCH-KILL.md`
-- [ ] `uwp/CMakeLists.txt`, `UWPPackaging.cmake`, `Package.appxmanifest.in`, `Assets/` (from Ymir)
-- [ ] `uwp/src/main.cpp`: `SDL_main` → hints → root probe → `gopher64_uwp_set_root` → `gopher64_uwp_main(autoboot args)`
-- [ ] `uwp/src/uwp_platform.cpp`: fd-level stdout/stderr redirect, VEH for `DBG_PRINTEXCEPTION_*`, unhandled-exception logger, `UseFullCoreWindowBounds`, drive probe
-- [ ] `/STACK:8388608`; link `WindowsApp.lib`, store CRT, Rust native libs
-- [ ] `scripts/uwp/audit-imports.ps1`: fail on `user32`, `gdi32`, `shell32`, `winmm`, `dwmapi`, `uxtheme`; print remaining imports
-- [ ] `scripts/uwp/{build,package,deploy-xbox}.ps1`, `xbox.env.example`
-- [ ] Sideload on a Windows PC first (same msix) — PC UWP runtime catches many issues quickly
+- [x] Review Ymir UWP handoff and scummvm-uwp tile-launch evidence for the integration plan
+- [x] Host CMake project, manifest template, and package assets; VS 2026 solution and MSIX generated (no separate packaging module required)
+- [x] SDL entry, LocalState root, C ABI call, first-frame status and autoboot; PC error-screen recovery tested
+- [ ] Window bounds, lifecycle and storage policy beyond LocalState; adopt drive probing only with integration evidence
+- [x] Link host with `/STACK:8388608`, `WindowsApp.lib`, Rust native libs and Store CRT imports
+- [ ] Audit final executable and packaged DLL imports against UWP-supported APIs; document any actual exceptions instead of relying only on DLL names
+- [ ] Build, package, PC install and import-audit scripts exist. Xbox deployment and F5 are performed manually by the user only; agents must not connect to the console.
+- [x] Sideload on Windows PC: status frame and missing-ROM C ABI probe pass; real ROM reaches Vulkan-window failure, not `rdp_init`
 - [ ] Deploy to Series X; set App type = **Game**; launch from tile (not debugger)
 - [ ] Log: root path chosen, memory available, tokio runtime up, ROM loaded, `video::init` reached
 - [ ] Answer Q-01 (stack), Q-04 (memory), Q-10 (tokio IO), Q-11 (`LoadLibraryA` import), Q-07 (env visibility)

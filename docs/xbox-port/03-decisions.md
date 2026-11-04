@@ -181,6 +181,8 @@ Surface: `VK_KHR_surface` + `VK_KHR_win32_surface`, `vkCreateWin32SurfaceKHR` wi
 <a id="d-08"></a>
 ## D-08 — Audio via XAudio2 in the host, exposed to Rust via C ABI
 
+> **Implementation status:** not implemented in the current staticlib: it still calls SDL audio. Compiling that call for UWP does not prove it works on Xbox. The Ymir runtime evidence and the P4 direction are summarized in [16 — P2 host/frontend plan](16-p2-host-frontend-plan.md); the exact ABI and buffering remain subject to integration and testing rather than assumed complete.
+
 **Context.** SDL3-uwp's WASAPI path deadlocks on Xbox (`SDL_wasapi_winrt.cpp:306/317`, Ymir D20). gopher64's audio surface is small (`src/ui/audio.rs`): `init`, `init_game_audio` (`SDL_OpenAudioDeviceStream`, S16 stereo at the AI frequency), `update_freq` (`SDL_SetAudioStreamFrequencyRatio` for drift control), `play_audio`, `pause/resume/close`, volume up/down.
 
 **Decision.** Implement `g64_audio_{init,set_freq,set_ratio,queue,queued_bytes,pause,resume,set_volume,close}` in `uwp/src/xaudio2_backend.cpp`, adapted from Ymir's 259-line `apps/ymir-sdl3/src/app/xaudio2_backend.cpp`, and call it from a `#[cfg(target_vendor = "uwp")]` branch of `audio.rs`. `IXAudio2SourceVoice::SetFrequencyRatio` maps 1:1 onto `SDL_SetAudioStreamFrequencyRatio`. Buffer ring: 4 × ~12 ms (the "Xbox stability floor" measured in dosbox-pure-uwp).
@@ -231,6 +233,8 @@ Surface: `VK_KHR_surface` + `VK_KHR_win32_surface`, `vkCreateWin32SurfaceKHR` wi
 <a id="d-12"></a>
 ## D-12 — Frontend: CLI-style boot first, then an ImGui gamepad shell in the host
 
+> **P2 refinement:** [16](16-p2-host-frontend-plan.md) brings a minimal C++/ImGui status screen forward into P2. Full shell features stay in P5. The same-window/renderer hand-off and direct C++ writes to Rust configuration described below are historical proposals, not proven decisions; use the integration plan's ownership and persistence rules.
+
 **Context.** The slint GUI cannot run (winit has no CoreWindow backend) and its game-launch model spawns processes. Ymir's UWP port has a proven gamepad-first ImGui "Shell" with a FromApp drive/folder browser (`apps/ymir-sdl3/src/platform/uwp/shell/`).
 
 **Decision.**
@@ -254,7 +258,7 @@ Surface: `VK_KHR_surface` + `VK_KHR_win32_surface`, `vkCreateWin32SurfaceKHR` wi
 
 **Context.** Ymir already has `UWPPackaging.cmake`, `Package.appxmanifest.in`, `scripts/uwp/{common,build-deps,build,package,deploy-xbox}.ps1`, `xbox.env.example`, a CI workflow and a tag scheme `uwp-vX.Y.Z.R`.
 
-**Decision.** Copy and adapt these into `uwp/` and `scripts/uwp/`. The VS generator builds the `.msix` directly; DLLs and assets are deployed via `VS_DEPLOYMENT_CONTENT`.
+**Decision.** Adapt the applicable build and packaging patterns into `uwp/` and `scripts/uwp/`. The VS generator builds the `.msix` directly; DLLs and assets use `VS_DEPLOYMENT_CONTENT`. Do not copy or run an automated Xbox deploy/launch script: only the user performs console deployment or F5.
 
 **Consequences.** Requires the VS 18 BuildTools UWP workload (present on this PC). See [08](08-packaging-deploy.md).
 
