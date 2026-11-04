@@ -172,3 +172,19 @@ parsing, CRT import self-check, and `git diff --check`; all passed. Native compi
   overwrite their running session for testing. Picker behavior and path access on Xbox remain
   untested and must be tested by the user. Even after ROM loading, the known SDL WinRT Vulkan
   blocker remains.
+
+### Dozen/P0 clarification
+
+The user asked whether the existing P0 Dozen work was being considered. **Yes: Dozen remains the
+graphics target**, not the Direct3D 11 renderer currently used by the temporary ImGui status screen.
+P0 tested parallel-rdp on desktop Dozen 26.2.4 with the specific 8-bit storage, incoherent RDRAM,
+single-threaded command, and ubershader settings documented in `14-p0-handoff.md`; it did not
+validate the UWP package or Xbox. Preserve those results and their limitations as the P3 baseline.
+
+The current UWP game code still requests `SDL_WINDOW_VULKAN` in `src/ui/video.rs` and uses
+`SDL_Vulkan_CreateSurface` in `parallel-rdp/wsi_platform.cpp`. WinRT SDL rejects the window before
+`rdp_init`, and the current package does not contain `vulkan_dzn.dll`. Thus the latest ROM test
+did not exercise Dozen at all. The planned P3 work in `04-vulkan-dozen.md` and the roadmap must
+provide the UWP Dozen ICD, loader, surface/CoreWindow integration, suitable feature flags and
+diagnostics, then verify the actual results; the documented sketches are not implemented or proved.
+No change to the chosen graphics direction was made, and Xbox deployment remains user-operated.
