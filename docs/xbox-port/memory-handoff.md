@@ -204,3 +204,21 @@ The debugger also emitted Windows Gaming Input HRESULTs `8685C003` and `80070057
 into this PC process; no causal connection to the observed Vulkan failure has been established.
 SDL3 DLLs are Release builds without symbols, as intended by the corrected Store CRT build workflow.
 The next graphics work remains the planned Dozen/P3 integration, subject to the user's direction.
+
+### Temporary ROM copies and next priority
+
+The user asked whether the same temporary copy is reused and requested a follow-up to eliminate
+copying after higher-priority issues. **The directory is shared per app, but copies are not reused:**
+`StorageFile.CopyAsync` uses `GenerateUniqueName`, creating another full copy on every selection,
+including repeated selections of the same ROM. The app does not explicitly remove these files;
+Windows may clear temporary storage, but there is no guaranteed cleanup schedule. On this PC, the
+development app's `TempState` contained one ROM-like file totaling 32 MiB at the time checked. No
+files were deleted. Later, replace staging with proven brokered/stream/handle access as appropriate,
+while protecting original ROMs and saves and addressing temporary paths in `recent_roms`; do not
+remove unrelated user files. This is intentionally deferred, not forgotten.
+
+The recommended next priority is the Dozen integration described above: use the P0 proven desktop
+settings as a baseline, study working UWP reference implementations, establish package/loader and
+SDL/CoreWindow surface integration with logs, and test the earliest verifiable graphics milestone on
+PC before the user chooses whether to deploy and test on Xbox. Do not treat the documentation's
+sketches or desktop P0 as proof of the UWP implementation.
