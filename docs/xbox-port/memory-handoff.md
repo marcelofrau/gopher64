@@ -2,7 +2,8 @@
 
 This is the shared, append-only handoff for agents working on the Xbox port. Read this file,
 `README.md`, and the detailed [P2 implementation handoff](17-p2-implementation-handoff.md)
-before continuing. Append an English dated entry after **each interaction**: intent, changes or
+before continuing. Append an English dated entry after **each interaction**, including the machine
+name from `$env:COMPUTERNAME` (PowerShell) or `hostname` (elsewhere): intent, changes or
 decisions, evidence and failed attempts, tests with actual outcomes, and remaining work. Do not
 include credentials, console addresses, commercial ROMs, or machine-specific absolute paths.
 Commit the agent's own work in logical increments; do not stage unrelated user files or push
@@ -12,30 +13,28 @@ unless requested.
 user performs console deployment or VS F5. Agent execution and automated tests stay on the PC.
 Never uninstall the existing app merely to refresh a package: its `LocalState` can contain data.
 
-## Agents and machines
+## Machines and evidence
 
-This port is worked on from more than one machine by more than one agent. Their environments and
-strengths differ, so match the task to the agent. The user coordinates between them via this file
-and git; agents do not talk to each other directly.
+Identify the current host at the start of work with `$env:COMPUTERNAME` in PowerShell, or
+`hostname` elsewhere. Use that name in new machine-specific notes, memories and handoff entries;
+if it cannot be determined, say **unknown**. A separate `.env` is unnecessary for identification.
+Tool availability and test results are dated observations, not guarantees; recheck when needed.
+Agent/model names are not machine names and do not determine their abilities or access.
 
-- **Opus agent (this one, "deep-analysis" machine).** Strong at multi-file investigation, fidelity
-  review, root-cause work and keeping the upstream diff minimal/gated. Environment limits: **no
-  Visual Studio 2026 and no Xbox access** here — it can build the Rust staticlib, the SDL/XAudio2
-  C/C++ via clang-cl, run `cargo` (fmt/clippy/test) and reason about logs, but it **cannot build
-  the UWP host MSIX via MSBuild/VS, cannot F5, and cannot run anything on the console**. Use it for
-  design, fidelity cleanups, tricky bugs, and anything provable on the PC with cargo/clang.
-- **Secondary agent ("build-and-console" machine, e.g. a lighter GPT model).** Shallower analysis,
-  but has **Visual Studio 2026** (builds/packages the host MSIX, runs `scripts/uwp/build-host.ps1`,
-  opens the VS solution) and can **ask the user to deploy and F5 on the Xbox and bring back console
-  logs and runtime feedback**. Use it for host/packaging work, VS-specific issues, and for getting
-  real Xbox execution evidence that the Opus machine cannot produce.
-- **Division of labour in practice:** Opus lands minimal, gated, fidelity-clean code and proves it
-  on the PC (link + desktop regression); the secondary agent takes that, builds the MSIX, and
-  drives console validation with the user. When Opus writes something that only the console can
-  confirm (audio playback, Dozen frames, lifecycle), it says so explicitly and leaves it for the
-  console machine to verify — never claims an Xbox result it could not have observed.
+- **YODA:** current host identified by `COMPUTERNAME` on 2026-11-05. The user identifies this as
+  the VS 2026 and Xbox-access environment; those capabilities were not re-tested in this update.
+  Only the user may deploy to or launch the Xbox, including VS F5.
+- **Other host, name unknown:** the 2026-11-05 Opus entries below were written on another PC. Its
+  reported Rust/clang tests and host-build investigation apply to that PC only. The later probe
+  found VS 18 Build Tools and a WindowsStore v180 toolset, but its ImGui download failed and a
+  complete host MSIX build was not established. Earlier statements that it had no VS 2026 are
+  superseded by that probe; do not assume the IDE or final packaging is available there.
 
-## Current state — 2026-11-04
+Older entries using "this PC", "Opus machine", "console machine" or agent labels are historical
+context, not reliable host names. Do not assign them to YODA or another name without evidence.
+Record future checks with the host name and distinguish PC evidence from user-performed Xbox tests.
+
+## Historical state — 2026-11-04
 
 - Branch: `uwp/main`, tracking `origin/uwp/main`. The original P1 work was already on this
   branch; the staticlib was not a complete installable Xbox app.
@@ -522,3 +521,24 @@ link/packaging errors before the console. Findings:
 - Net: the Opus machine cannot complete the host MSIX build (ImGui fetch + final appx packaging are
   the gaps), so host build/package/F5 stays with the console machine. No code change resulted; this
   is a recorded environment finding. Probe build dirs (`out/uwp-host-probe*`) were deleted.
+
+### Machine identity and handoff clarification — 2026-11-05 — YODA
+
+- The user asked for machine-based context after pulling the latest Opus work. PowerShell's
+  `COMPUTERNAME` reports `YODA`; the user identifies it as the VS 2026/Xbox-access environment.
+  The other host's name is not recorded, so it remains unknown rather than being guessed.
+- Updated `AGENTS.md`, `CLAUDE.md` and this journal to identify the host at the start of work and
+  name it in future machine-specific memories and entries. The operating system already provides
+  the name, so no additional `.env` or local configuration was introduced. Clarified that agent
+  identity does not determine machine capabilities, and labeled the README toolchain observation
+  and older journal state as historical. The later Opus probe found VS Build Tools despite earlier
+  claims of no VS; its ImGui network failure and unverified MSIX packaging remain distinct.
+- Reviewed the latest handoff, rendering bring-up guide and P5 design vision. XAudio2 and graphics
+  logging/instrumentation are in place, but real audio, first frame, D3D11-to-Dozen hand-over and
+  Xbox execution remain unverified. The P5 shell is a design, not an implementation. The user alone
+  deploys and runs on Xbox; no console interaction was attempted.
+- Verification: `COMPUTERNAME` identified YODA; the known local ROM directory exists, but its files
+  were not inspected. `git diff --check` passed for the documentation changes. No build, VS toolchain
+  check, game or console test was run; this was a documentation-only update. An existing untracked
+  `out/` directory was left untouched. Recheck machine capabilities before relying on them and
+  record the other host's actual name when observed there.

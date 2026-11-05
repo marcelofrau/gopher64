@@ -101,7 +101,7 @@ flowchart LR
 | Dozen DLL exports | `vk_icdGetInstanceProcAddr`, `vk_icdGetPhysicalDeviceProcAddr`, `vk_icdNegotiateLoaderICDInterfaceVersion`; App CRT | `dumpbin` of RetroArch's bundled `vulkan_dzn.dll` |
 | SDL3-uwp | No Vulkan in the WinRT video driver; `SDL_WINDOW_VULKAN` makes `SDL_CreateWindow` fail | `SDL3-uwp/src/video/SDL_video.c:2678` |
 | Rust UWP | Release and Debug staticlibs build for `x86_64-uwp-windows-msvc`; C ABI symbols verified | [15](15-local-build-debug-workflow-plan.md) |
-| Toolchain on this PC | VS Community 2026 (18.11), MSVC 14.51, SDK 10.0.28000, CMake 4.4.4; Rust LLVM 23.1.1 + clang-cl 23.1.4 | Local verification, 2026-11-04 |
+| Historical toolchain (host name unrecorded) | VS Community 2026 (18.11), MSVC 14.51, SDK 10.0.28000, CMake 4.4.4; Rust LLVM 23.1.1 + clang-cl 23.1.4 | Local verification, 2026-11-04; recheck on the current host |
 | Rust UWP build command | `pwsh -NoProfile -File scripts/uwp/build.ps1`; output at `target/x86_64-uwp-windows-msvc/release/deps/gopher64.lib` | [15](15-local-build-debug-workflow-plan.md) |
 | Native static libraries | VS host links in Debug and Release; final imported APIs, dynamic loads and Xbox availability still require validation | [17](17-p2-implementation-handoff.md) |
 | Dozen on Xbox in the wild | ≥ 5 shipped projects since 2026-10-04 (OnyxEMU first); none is an N64 / parallel-rdp user | [11](11-prior-art.md) |
