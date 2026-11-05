@@ -12,7 +12,7 @@ Set-StrictMode -Version Latest
     -SkipDependencies:$SkipDependencies -InitSubmodules:$InitSubmodules
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $vs = Get-UwpVisualStudio
-$build = Join-Path $root "out/uwp-host-vs$($vs.Version)"
+$build = Get-UwpHostBuildDir $root $vs.Version
 $solution = Get-ChildItem $build -File | Where-Object { $_.Name -in @('Gopher64UWP.sln', 'Gopher64UWP.slnx') } | Select-Object -First 1
 if (-not $solution) { throw "No Visual Studio solution was generated in $build." }
 $devenv = Join-Path $vs.Install 'Common7/IDE/devenv.exe'

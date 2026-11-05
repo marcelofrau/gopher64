@@ -610,3 +610,28 @@ link/packaging errors before the console. Findings:
   and capture the new VS Output through the last line after loading Mario 64. Do not infer the old
   hang is fixed until that test. The prior advice to rerun `open-vs.ps1` before every F5 is superseded
   by the project dependency; regeneration remains needed after generator/build-configuration changes.
+
+### AppX rejected the new out junction — 2026-11-05 — YODA
+
+- The user's F5 reported `DEP0700`, `0x80073CF0` and `0x800701C0`: opening `AppxManifest.xml`
+  failed because the path contains an untrusted mount point. This occurred before game execution.
+  The previously introduced repository `out` junction is in the existing solution's layout path.
+- Microsoft's [RedirectionGuard explanation](https://www.microsoft.com/en-us/msrc/blog/2025/06/redirectionguard-mitigating-unsafe-junction-traversal-in-windows)
+  states that AppX Deployment Service uses the mitigation and untrusted junction traversal can be
+  blocked. This supports the diagnosis; the direct-path F5 is still needed to verify it here.
+- `build-host.ps1` and `open-vs.ps1` now share `Get-UwpHostBuildDir`: when `out` itself is a link,
+  use its resolved target and a separate `uwp-host-vs<version>-direct` build directory, preserving
+  existing CMake caches and data. Otherwise retain the original output location. This does not
+  resolve other links in ancestor directories; investigate those separately if encountered. The
+  repository `out` and `target` junctions and F: backup were not modified; no security policy or
+  junction trust was changed.
+- Generated a fresh solution directly on H:, using the existing ImGui source cache, and successfully
+  built the Debug host and MSIX with the normal script. Its generated Debug `OutDir` uses the physical
+  H: path; each existing directory from the drive root to that output was checked and is not a link.
+  Host path resolver tests (missing, normal, junction), generated VS dependency tests, import-audit
+  tests and `git diff --check` passed. Existing compile/link/packaging warnings remain. One attempt to
+  capture the build log failed with a PowerShell parser error before execution; the normal build
+  command then succeeded. No package registration or app launch was attempted by the agent.
+- Pending: the user must close the old solution and open the new `-direct` solution using the physical
+  H: path, then F5 on PC. Only a successful registration can confirm the workaround; runtime ROM,
+  audio and Xbox results remain pending.

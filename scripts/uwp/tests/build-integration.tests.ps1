@@ -1,6 +1,11 @@
-param([string]$BuildDir = (Join-Path $PSScriptRoot '../../../out/uwp-host-vs2026'))
+param([string]$BuildDir)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '../common.ps1')
+if (-not $BuildDir) {
+    $root = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
+    $BuildDir = Get-UwpHostBuildDir $root (Get-UwpVisualStudio).Version
+}
 $hostProject = Get-Content -LiteralPath (Join-Path $BuildDir 'gopher64-uwp.vcxproj') -Raw
 $rustProject = Get-Content -LiteralPath (Join-Path $BuildDir 'gopher64-rust.vcxproj') -Raw
 

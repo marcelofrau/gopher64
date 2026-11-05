@@ -23,6 +23,16 @@ function Test-UwpAllowedAdvapiImports([string[]]$Lines) {
     return $true
 }
 
+function Get-UwpHostBuildDir([string]$Root, [string]$Version) {
+    $out = Join-Path $Root 'out'
+    $item = Get-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue
+    if ($item -and $item.LinkType) {
+        # shortcut: resolves the out link only; resolve ancestor links too if encountered.
+        return Join-Path $item.ResolvedTarget "uwp-host-vs$Version-direct"
+    }
+    return Join-Path $out "uwp-host-vs$Version"
+}
+
 function Get-UwpVisualStudio {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (-not (Test-Path $vswhere)) { throw 'vswhere.exe not found; install Visual Studio with the UWP C++ tools.' }

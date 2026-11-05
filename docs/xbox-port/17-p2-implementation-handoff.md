@@ -109,6 +109,10 @@ Regenerate older solutions with `open-vs.ps1` before relying on this. A command-
 MSIX but does not deploy it or necessarily refresh the local `Debug/AppX` layout; VS F5 deploys it.
 `-SkipDependencies` reuses existing SDL dependencies. The explicit `build-host.ps1 -SkipRust`
 option bypasses Rust and can use a stale library; never use it after changing core sources.
+If the repository's `out` directory is a junction or symlink, the scripts use its resolved target
+and generate a separate `uwp-host-vs<version>-direct` solution. Open that solution by the physical
+path printed by the script: AppX deployment can reject a layout reached through an untrusted
+junction. Existing generated solutions are preserved, but still use their original paths.
 
 ```powershell
 # Full Release build, including SDL and Rust; prints the exact MSIX path.

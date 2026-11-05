@@ -13,7 +13,7 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'common.ps1')
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $vs = Get-UwpVisualStudio
-$build = Join-Path $root "out/uwp-host-vs$($vs.Version)"
+$build = Get-UwpHostBuildDir $root $vs.Version
 $candidate = Join-Path $root '../scummvm-uwp/extern/retroarch/pkg/msvc-uwp/RetroArch-msvcUWP/MESA/x64'
 if (-not $DozenDir -and (Test-Path -LiteralPath (Join-Path $candidate 'vulkan_dzn.dll'))) { $DozenDir = $candidate }
 if ($DozenDir) {
