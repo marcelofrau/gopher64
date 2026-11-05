@@ -828,3 +828,10 @@ link/packaging errors before the console. Findings:
 - After the relay refactor, the desktop SDL virtual gamepad test and a simulated scheduling-failure
   ownership/logging test passed. Neither proves WGI, real input, final PC playback or Xbox behavior.
   See [21](21-first-xbox-smoke-test.md) for the next manual test and log checklist.
+
+## 2026-11-05 - YODA: publication requested
+
+- The user authorized pushing the consolidated input and Xbox smoke-build commits to `uwp/main`.
+  The remote was fetched and had no commits ahead of the local branch. Console testing remains pending.
+- Fidelity review notes that the hook inventory still lacks `src/device.rs` and `src/ui/config.rs`;
+  the historical over-budget exception remains open against the local `main` baseline.
