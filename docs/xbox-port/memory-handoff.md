@@ -781,3 +781,23 @@ link/packaging errors before the console. Findings:
 - The user authorized committing and pushing this work and indicated there is another issue to
   resolve before Xbox testing; its details have not yet been provided. No automated Xbox access or
   deployment is authorized.
+
+## 2026-11-05 - YODA: UWP gamepad investigation
+
+- The user reports that gamepad input does not reach the emulated game on the PC; Xbox is not tested.
+- Ymir enables WGI before SDL initialization and opens gamepads on connection. The vendored SDL
+  WGI driver defaults off, and `SDL_Quit()` clears hints between the Gopher64 frontend and game.
+- Gopher64 defaults to no controller assignment; the frontend has no assignment UI. SDL events
+  are already pumped, so the change does not alter rendering or frame scheduling.
+- Read-only inspection of YODA's active UWP config confirmed player 1 enabled, default gamepad
+  profile, and zero assigned slots. No config, ROM or save data was modified by this inspection.
+- WGI and system-back hints are enabled before each SDL initialization. The first recognized
+  gamepad binds to player 1 only when no explicit assignment exists; configuration is not saved.
+- The UWP event watch handles mapped-gamepad additions; logs report enumeration, binding,
+  disconnection, and Start presses with the mapped N64 Start bit.
+- Release build, standalone policy tests, and import-module audit passed. The first build failed on
+  missing UWP-only controller fields; all four initializers were fixed and the build passed.
+- The virtual SDL enumeration, Start and hotplug test passed on desktop SDL. The UWP DLL did not
+  load outside its AppX runtime; this test does not validate UWP, WGI, real input or Xbox.
+- Pending: user tests the experimental Release on PC, reports input logs, Start, other controls,
+  reconnect, graphics and audio; only the user performs Xbox deployment when ready.

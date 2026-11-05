@@ -316,6 +316,13 @@ bool sdl_event_filter(void *userdata, SDL_Event *event) {
     joystick_event->joystick_id = event->jdevice.which;
     joystick_event->connected = true;
     SDL_RunOnMainThread(add_joystick_event, joystick_event, false);
+#ifdef GOPHER64_UWP
+  } else if (event->type == SDL_EVENT_GAMEPAD_ADDED) {
+    JoystickEvent *joystick_event = new JoystickEvent;
+    joystick_event->joystick_id = event->gdevice.which;
+    joystick_event->connected = true;
+    SDL_RunOnMainThread(add_joystick_event, joystick_event, false);
+#endif
   } else if (event->type == SDL_EVENT_JOYSTICK_REMOVED) {
     JoystickEvent *joystick_event = new JoystickEvent;
     joystick_event->joystick_id = event->jdevice.which;

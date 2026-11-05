@@ -285,6 +285,11 @@ int main(int, char**) {
     int result = 0;
     bool after_game = false;
     for (;;) {
+        SDL_SetHint(SDL_HINT_JOYSTICK_WGI, "1");
+        SDL_SetHint(SDL_HINT_WINRT_HANDLE_BACK_BUTTON, "1");
+        if (!SDL_GetHintBoolean(SDL_HINT_JOYSTICK_WGI, false)) {
+            log("Input: Windows Gaming Input is disabled by an SDL hint override");
+        }
         if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
             log(std::string("SDL_Init failed: ") + SDL_GetError());
             close_log();

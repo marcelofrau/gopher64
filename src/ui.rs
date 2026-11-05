@@ -162,6 +162,14 @@ pub struct Ui {
 
 pub fn sdl_hints() {
     unsafe {
+        #[cfg(target_vendor = "uwp")]
+        {
+            sdl3_sys::hints::SDL_SetHint(sdl3_sys::hints::SDL_HINT_JOYSTICK_WGI, c"1".as_ptr());
+            sdl3_sys::hints::SDL_SetHint(c"SDL_WINRT_HANDLE_BACK_BUTTON".as_ptr(), c"1".as_ptr());
+            if !sdl3_sys::hints::SDL_GetHintBoolean(sdl3_sys::hints::SDL_HINT_JOYSTICK_WGI, false) {
+                uwp::entry::log("input: Windows Gaming Input is disabled by an SDL hint override");
+            }
+        }
         std::env::set_var("__NV_PRIME_RENDER_OFFLOAD", "1");
 
         let hint = std::ffi::CString::new("1").unwrap();
@@ -258,24 +266,32 @@ impl Ui {
                         joystick: std::ptr::null_mut(),
                         guid: sdl3_sys::guid::SDL_GUID::default(),
                         last_key_state: 0,
+                        #[cfg(target_vendor = "uwp")]
+                        gamepad_start_pressed: false,
                     },
                     input::Controllers {
                         game_controller: std::ptr::null_mut(),
                         joystick: std::ptr::null_mut(),
                         guid: sdl3_sys::guid::SDL_GUID::default(),
                         last_key_state: 0,
+                        #[cfg(target_vendor = "uwp")]
+                        gamepad_start_pressed: false,
                     },
                     input::Controllers {
                         game_controller: std::ptr::null_mut(),
                         joystick: std::ptr::null_mut(),
                         guid: sdl3_sys::guid::SDL_GUID::default(),
                         last_key_state: 0,
+                        #[cfg(target_vendor = "uwp")]
+                        gamepad_start_pressed: false,
                     },
                     input::Controllers {
                         game_controller: std::ptr::null_mut(),
                         joystick: std::ptr::null_mut(),
                         guid: sdl3_sys::guid::SDL_GUID::default(),
                         last_key_state: 0,
+                        #[cfg(target_vendor = "uwp")]
+                        gamepad_start_pressed: false,
                     },
                 ],
                 keyboard_state: std::ptr::null_mut(),
