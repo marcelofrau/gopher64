@@ -106,6 +106,7 @@ pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
         )
     };
 
+    // UWP-PORT: UWP video bring-up: host logging and error propagation instead of panic (D-07)
     #[cfg(target_vendor = "uwp")]
     crate::ui::uwp::entry::log("creating SDL game window for Dozen WSI");
     device.ui.video.window = unsafe {
@@ -121,6 +122,7 @@ pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
                 unsafe { std::ffi::CStr::from_ptr(err).to_string_lossy() }
             }
         );
+        // UWP-PORT: UWP video bring-up: host logging and error propagation instead of panic (D-07)
         #[cfg(target_vendor = "uwp")]
         {
             crate::ui::uwp::entry::log(&message);
@@ -139,6 +141,7 @@ pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
                 unsafe { std::ffi::CStr::from_ptr(err).to_string_lossy() }
             }
         );
+        // UWP-PORT: UWP video bring-up: host logging and error propagation instead of panic (D-07)
         #[cfg(target_vendor = "uwp")]
         {
             unsafe { sdl3_sys::video::SDL_DestroyWindow(device.ui.video.window) };
@@ -154,6 +157,7 @@ pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
 
     let gfx_info = build_gfx_info(device, netplay);
 
+    // UWP-PORT: UWP video bring-up: host logging and error propagation instead of panic (D-07)
     #[cfg(target_vendor = "uwp")]
     crate::ui::uwp::entry::log("entering rdp_init");
     unsafe {
@@ -165,6 +169,7 @@ pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
             font_bytes.len(),
             device.ui.storage.save_state_slot,
         ) {
+            // UWP-PORT: UWP video bring-up: host logging and error propagation instead of panic (D-07)
             #[cfg(target_vendor = "uwp")]
             {
                 rdp_close();
@@ -177,9 +182,11 @@ pub fn init(device: &mut device::Device, netplay: bool) -> std::io::Result<()> {
         }
     }
 
+    // UWP-PORT: UWP video bring-up: host logging and error propagation instead of panic (D-07)
     #[cfg(target_vendor = "uwp")]
     crate::ui::uwp::entry::log("rdp_init succeeded");
     fps_counter(&mut device.ui);
+    // UWP-PORT: UWP video bring-up: host logging and error propagation instead of panic (D-07)
     #[cfg(target_vendor = "uwp")]
     crate::ui::uwp::entry::log("FPS counter task started");
     Ok(())

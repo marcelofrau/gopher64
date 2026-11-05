@@ -12,6 +12,29 @@ unless requested.
 user performs console deployment or VS F5. Agent execution and automated tests stay on the PC.
 Never uninstall the existing app merely to refresh a package: its `LocalState` can contain data.
 
+## Agents and machines
+
+This port is worked on from more than one machine by more than one agent. Their environments and
+strengths differ, so match the task to the agent. The user coordinates between them via this file
+and git; agents do not talk to each other directly.
+
+- **Opus agent (this one, "deep-analysis" machine).** Strong at multi-file investigation, fidelity
+  review, root-cause work and keeping the upstream diff minimal/gated. Environment limits: **no
+  Visual Studio 2026 and no Xbox access** here — it can build the Rust staticlib, the SDL/XAudio2
+  C/C++ via clang-cl, run `cargo` (fmt/clippy/test) and reason about logs, but it **cannot build
+  the UWP host MSIX via MSBuild/VS, cannot F5, and cannot run anything on the console**. Use it for
+  design, fidelity cleanups, tricky bugs, and anything provable on the PC with cargo/clang.
+- **Secondary agent ("build-and-console" machine, e.g. a lighter GPT model).** Shallower analysis,
+  but has **Visual Studio 2026** (builds/packages the host MSIX, runs `scripts/uwp/build-host.ps1`,
+  opens the VS solution) and can **ask the user to deploy and F5 on the Xbox and bring back console
+  logs and runtime feedback**. Use it for host/packaging work, VS-specific issues, and for getting
+  real Xbox execution evidence that the Opus machine cannot produce.
+- **Division of labour in practice:** Opus lands minimal, gated, fidelity-clean code and proves it
+  on the PC (link + desktop regression); the secondary agent takes that, builds the MSIX, and
+  drives console validation with the user. When Opus writes something that only the console can
+  confirm (audio playback, Dozen frames, lifecycle), it says so explicitly and leaves it for the
+  console machine to verify — never claims an Xbox result it could not have observed.
+
 ## Current state — 2026-11-04
 
 - Branch: `uwp/main`, tracking `origin/uwp/main`. The original P1 work was already on this
@@ -377,3 +400,31 @@ and authorized continuing with Dozen integration. Direct/brokered ROM access rem
   (write_json refactor), and a submodule source file swapped via `uwp/compat/rdp_device_uwp.cpp`.
   Some fix real bugs and are upstream-PR candidates. These are already flagged in the doc's
   "Fidelity deviations requiring ongoing review" section; a dedicated cleanup pass is deferred.
+
+### Fidelity cleanup pass and agent roster — 2026-11-05
+
+- Added an "Agents and machines" section at the top of this file: the Opus deep-analysis machine
+  (no VS 2026, no Xbox; builds the Rust staticlib + clang-cl C/C++, runs cargo, reasons about logs)
+  vs the secondary VS-2026/console machine (builds the host MSIX, can ask the user to F5/deploy on
+  Xbox and return logs). Match tasks accordingly.
+- Reviewed the earlier P2/P3 commits for fidelity and did a low-risk cleanup, per the user's choice
+  to keep P3 instrumentation and keep genuine bug fixes rather than revert:
+  - Added the missing `UWP-PORT` markers to every previously unmarked hook:
+    `parallel-rdp/interface.cpp` (9 Dozen WSI/log blocks), `parallel-rdp/wsi_platform.cpp` (4
+    CoreWindow-surface blocks), `src/ui/video.rs` (bring-up diagnostics + error-vs-panic branches),
+    `src/device.rs` (bring-up logs + the staged-ROM sniff block), `src/ui/config.rs`
+    (write-error sink), `uwp/compat/rdp_device_uwp.cpp`.
+  - Tagged the non-gated bug fixes in-code as upstream-PR candidates (not reverted):
+    `src/device/rdram.rs` `AlignedRdram` (real heap-UB fix, savestate bytes preserved by test) and
+    `src/device.rs` `swap_rom`/`get_rom_contents`/`run_game` (panic -> None/Result on bad input).
+  - Clarified a prior mischaracterization: `uwp/compat/rdp_device_uwp.cpp` does NOT modify the RDP
+    submodule; it `#define`s `getenv` and then `#include`s the unmodified submodule `rdp_device.cpp`,
+    so R4 is not violated. Updated the deviations section in 00-upstream-fidelity-rules.md.
+  - Kept the `video.rs`/`device.rs` host-log lines on purpose: they are the console machine's P3
+    Dozen instrumentation and should stay until P3 is validated on Xbox, then be consolidated.
+  - Still open (owned by the VS/console machine): `scripts/uwp/SDL3-pointer-access.patch` should be
+    upstreamed to the SDL fork rather than kept as a generated-snapshot patch.
+- No logic changed in this pass (markers/comments/doc only). Verified on PC by the Opus agent:
+  `cargo fmt --check` clean, desktop `cargo check --no-default-features` and the UWP staticlib
+  `cargo check` both exit 0. No Xbox test (cannot, this machine). The XAudio2 audio backend from the
+  same day (commit 0953db8) is pushed to origin/uwp/main and still needs console playback validation.

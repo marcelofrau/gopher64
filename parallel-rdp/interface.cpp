@@ -10,6 +10,7 @@
 #include <cmath>
 #include <map>
 
+// UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
 extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader();
 extern "C" void gopher64_uwp_log_native(const char *message);
@@ -399,6 +400,7 @@ static ImageHandle create_message_image(Vulkan::Device &device, int width,
 
 bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
               size_t font_size, uint32_t save_state_slot) {
+// UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
   g64_first_swapchain_frame = false;
 #endif
@@ -436,6 +438,7 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   }
   wsi->set_backbuffer_srgb(false);
   Context::SystemHandles handles = {};
+// UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
   auto loader = g64_uwp_dozen_loader();
   if (!loader) {
@@ -449,6 +452,7 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
           (PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr())) {
 #endif
     LOGE("Failed to init vulkan loader.\n");
+// UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
     gopher64_uwp_log_native("Dozen: Granite loader initialization failed");
 #endif
@@ -457,6 +461,7 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   }
   if (!wsi->init_simple(1, handles)) {
     LOGE("Failed to init parallel-rdp.\n");
+// UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
     gopher64_uwp_log_native("Dozen: Granite WSI initialization failed");
 #endif
@@ -466,12 +471,14 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
 
   rdp_new_processor();
 
+// UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
   gopher64_uwp_log_native("Dozen: Granite WSI initialized; checking RDP processor");
 #endif
 
   if (!processor->device_is_supported()) {
     LOGE("Failed to init parallel-rdp processor.\n");
+// UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
     gopher64_uwp_log_native("Dozen: RDP processor reports unsupported device features");
 #endif
@@ -492,6 +499,7 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
     return false;
   }
 
+// UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
   if (!wsi->begin_frame()) {
     gopher64_uwp_log_native("Dozen: initial WSI begin_frame failed");
@@ -769,6 +777,7 @@ void rdp_update_screen() {
       props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, nullptr);
   if (android_pointer && wsi_platform->is_surface_valid()) {
 #endif
+// UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
     const bool touched = wsi->get_device().swapchain_touched();
     if (!wsi->end_frame()) {

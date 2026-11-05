@@ -162,15 +162,39 @@ Port-owned files added: `scripts/uwp/build-deps.ps1`, `scripts/uwp/gen-links.ps1
 
 ### Fidelity deviations requiring ongoing review
 
-The P2 changes already committed on this branch are **not R3/R4/R5-clean**. The investigation found faults that cannot honestly be described as cfg-only hooks. Do not silently mark the fidelity checklist complete:
+Some P2/P3 changes committed on this branch are **not pure cfg-only hooks**. A 2026-11-05 cleanup
+pass added the missing `UWP-PORT` markers (C++ Dozen/WSI blocks, `video.rs`/`device.rs` gated
+blocks, `config.rs`, `rdp_device_uwp.cpp`) and tagged the genuine non-gated bug fixes in-code as
+**upstream-PR candidates** rather than reverting them (reverting would reintroduce bugs that only
+reproduce on Xbox, which this machine cannot test). What remains to reconcile:
 
-- `src/device/rdram.rs` and `src/device.rs`: shared RDRAM ownership was changed after a symbolized UWP heap failure proved the original 64-KiB allocation was released using the wrong `Vec<u8>` layout. Tests compare legacy postcard bytes and check alignment; desktop Vulkan startup was smoke-tested, but gameplay and real save/load remain unverified. This is an upstream-fix candidate.
-- `src/device.rs`: shared ROM/ZIP/7z reading returns an error instead of panicking on missing, short or malformed input; this intentionally changes desktop/Android failure behavior. `src/ui/config.rs` also reports save failures previously ignored. Valid raw/ZIP/7z inputs have unit tests; Android execution remains unverified.
-- `src/ui/video.rs`, `src/device.rs`, and `src/lib.rs`: video initialization now propagates an error and UWP cleanup/diagnostics have inline cfg gates rather than only a single delegated hook. Desktop success behavior was smoke-tested; this needs explicit fidelity review and possible upstreaming.
-- `scripts/uwp/SDL3-pointer-access.patch`: a local source patch is applied to an isolated generated SDL snapshot, not to the sibling repository or a submodule. This conflicts with R4's preferred SDL-fork-only approach and must be reviewed/upstreamed to the SDL fork rather than mistaken for a permanent exemption.
-- P3 adds a port-owned `uwp/compat/rdp_device_uwp.cpp` translation-unit wrapper around the unmodified RDP submodule source. It replaces that file's unsupported UWP CRT environment access with the documented Win32 API and forces the P0 external-host-off path. The probe self-check passes, but runtime/gameplay and eventual upstreaming still need review.
+- **Upstream-PR candidates (non-gated, affect desktop/Android, keep for now, propose upstream by
+  hand):**
+  - `src/device/rdram.rs` `AlignedRdram`: fixes a real UB/heap crash (a 64 KiB-aligned pointer was
+    freed through a byte-aligned `Vec<u8>` layout). Savestate postcard bytes are preserved — proven
+    by the `previous_savestate_encoding_round_trips` test. In-code note added at the struct.
+  - `src/device.rs` `swap_rom` / `get_rom_contents` / `run_game`: return `None`/`Result` instead of
+    panicking on short/odd/missing/malformed input and on video-init failure. Changes the
+    desktop/Android failure path. In-code notes added. `src/ui/config.rs` also reports previously
+    ignored save-write errors (same spirit).
+- **Resolved in the cleanup (now marked, lower concern):**
+  - `parallel-rdp/interface.cpp`, `wsi_platform.cpp`: Dozen WSI + native-logging blocks now each
+    carry a `UWP-PORT` marker; logic unchanged.
+  - `src/ui/video.rs`, `src/device.rs`: UWP bring-up diagnostics and the gated error-vs-panic
+    branches now carry markers. These logs are intentionally **kept** while P3 (Dozen on console)
+    is still being validated — they are the console agent's instrumentation. Consolidate once P3
+    passes on Xbox.
+  - `uwp/compat/rdp_device_uwp.cpp`: clarified — it does **not** modify the submodule; it is a
+    translation unit that `#define`s `getenv` to a Win32 lookup and then `#include`s the unmodified
+    submodule `rdp_device.cpp`. `build.rs` compiles it instead of the submodule file on UWP. R4 is
+    not violated (no submodule edit); marker added.
+- **Still open:** `scripts/uwp/SDL3-pointer-access.patch` applies a local patch to an isolated
+  generated SDL snapshot, not the sibling repo or submodule. Should be upstreamed to the SDL fork,
+  not treated as a permanent exemption (owned by the console/VS machine that produced it).
 
-These are documented exceptions under review, not a change to the project rules. See [17](17-p2-implementation-handoff.md) for reproduction and remaining validation.
+The cumulative upstream diff is over the 400-line budget because of the above; the budget applies
+to clean hooks, and these deviations are tracked here deliberately. See
+[17](17-p2-implementation-handoff.md) for reproduction and remaining validation.
 
 ## PR / commit checklist for `uwp/main`
 

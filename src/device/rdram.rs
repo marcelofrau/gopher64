@@ -19,6 +19,13 @@ pub const RDRAM_MASK: usize = 0xFFFFFF;
 
 const RDRAM_ALIGNMENT: usize = 64 * 1024;
 
+// UWP-PORT NOTE (upstream-PR candidate, not a cfg hook): AlignedRdram replaces an
+// alloc_zeroed + Vec::from_raw_parts pattern that handed a 64 KiB-aligned pointer to a Vec<u8>
+// whose deallocation layout is byte-aligned — undefined behavior that caused a symbolized heap
+// crash on Xbox. It keeps an ordinary Vec and exposes a 64 KiB-aligned slice inside it. The
+// postcard savestate encoding is preserved (see the round-trip test below). This applies to all
+// platforms and should be proposed upstream by hand; tracked under "Fidelity deviations requiring
+// ongoing review" in docs/xbox-port/00-upstream-fidelity-rules.md.
 #[derive(Default)]
 pub struct AlignedRdram {
     storage: Vec<u8>,

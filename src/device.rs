@@ -47,6 +47,10 @@ pub mod tlb;
 pub mod unmapped;
 pub mod vi;
 
+// UWP-PORT NOTE (upstream-PR candidate, not a cfg hook): run_game and get_rom_contents now return
+// a Result / propagate None instead of panicking on video-init failure or missing/malformed ROMs.
+// This changes the desktop/Android failure path and should be proposed upstream by hand. Tracked
+// under "Fidelity deviations requiring ongoing review" in docs/xbox-port/00-upstream-fidelity-rules.md.
 pub fn run_game(
     device: &mut Device,
     rom_contents: &[u8],
@@ -69,12 +73,15 @@ pub fn run_game(
     rdram::init(device);
 
     ui::video::init(device, netplay_config.is_some())?;
+    // UWP-PORT: UWP bring-up diagnostics to the host log (D-07)
     #[cfg(target_vendor = "uwp")]
     ui::uwp::entry::log("initializing audio");
     ui::audio::init(device);
+    // UWP-PORT: UWP bring-up diagnostics to the host log (D-07)
     #[cfg(target_vendor = "uwp")]
     ui::uwp::entry::log("audio initialized; initializing input");
     ui::input::init(&mut device.ui);
+    // UWP-PORT: UWP bring-up diagnostics to the host log (D-07)
     #[cfg(target_vendor = "uwp")]
     ui::uwp::entry::log("input initialized; initializing emulated hardware");
 
@@ -122,6 +129,7 @@ pub fn run_game(
         cheats::init(device, game_settings.cheats);
     }
 
+    // UWP-PORT: UWP bring-up diagnostics to the host log (D-07)
     #[cfg(target_vendor = "uwp")]
     ui::uwp::entry::log("entering emulated CPU loop");
     cpu::run(device);
@@ -168,6 +176,11 @@ fn init_rng_rtc(device: &mut Device) {
     }
 }
 
+// UWP-PORT NOTE (upstream-PR candidate, not a cfg hook): the length checks below harden swap_rom
+// against short/odd ROMs that previously panicked in try_into().unwrap(). This changes
+// desktop/Android behavior (panic -> None) and should be proposed upstream by hand, not kept as a
+// fork-only divergence. Tracked under "Fidelity deviations requiring ongoing review" in
+// docs/xbox-port/00-upstream-fidelity-rules.md.
 fn swap_rom(contents: Vec<u8>) -> Option<Vec<u8>> {
     if contents.len() < 0x1000 {
         return None;
@@ -206,6 +219,8 @@ fn swap_rom(contents: Vec<u8>) -> Option<Vec<u8>> {
 pub fn get_rom_contents(file_path: &std::path::PathBuf) -> Option<Vec<u8>> {
     let mut contents = vec![];
     let extension = file_path.extension().unwrap_or_default();
+    // UWP-PORT: the host stages the ROM as a fixed-name file (gopher64-staged.rom) whose extension
+    // is lost, so sniff zip/7z magic bytes to recover the format. Also enabled under `test`. (D-10)
     #[cfg(any(target_vendor = "uwp", all(test, not(target_os = "android"))))]
     let extension = if file_path
         .file_name()

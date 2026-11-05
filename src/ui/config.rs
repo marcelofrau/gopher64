@@ -140,6 +140,8 @@ fn write_json(path: &std::path::Path, value: &impl serde::Serialize) -> std::io:
     serde_json::to_writer_pretty(file, value).map_err(std::io::Error::other)
 }
 
+// UWP-PORT: on UWP stderr is captured differently, so route the write-error report to the host
+// log instead of eprintln!. Desktop/Android keep eprintln!. (D-10)
 fn report_write_error(kind: &str, error: &std::io::Error) {
     #[cfg(target_vendor = "uwp")]
     crate::ui::uwp::entry::log(&format!("Error writing {kind}: {error}"));

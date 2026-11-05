@@ -1,5 +1,6 @@
 #include "wsi_platform.hpp"
 #include <SDL3/SDL_vulkan.h>
+// UWP-PORT: CoreWindow Vulkan surface for Dozen WSI (D-07)
 #ifdef GOPHER64_UWP
 #include <SDL3/SDL_properties.h>
 #include <cstdio>
@@ -8,6 +9,7 @@ extern "C" void gopher64_uwp_log_native(const char *message);
 
 VkSurfaceKHR SDL_WSIPlatform::create_surface(VkInstance instance,
                                              VkPhysicalDevice gpu) {
+// UWP-PORT: CoreWindow Vulkan surface for Dozen WSI (D-07)
 #ifdef GOPHER64_UWP
   auto core_window = SDL_GetPointerProperty(SDL_GetWindowProperties(window),
                                              SDL_PROP_WINDOW_WINRT_WINDOW_POINTER,
@@ -44,6 +46,7 @@ VkSurfaceKHR SDL_WSIPlatform::create_surface(VkInstance instance,
 void SDL_WSIPlatform::destroy_surface(VkInstance instance,
                                       VkSurfaceKHR surface) {
   surface_valid = false;
+// UWP-PORT: CoreWindow Vulkan surface for Dozen WSI (D-07)
 #ifdef GOPHER64_UWP
   if (surface) vkDestroySurfaceKHR(instance, surface, nullptr);
 #else
@@ -52,6 +55,7 @@ void SDL_WSIPlatform::destroy_surface(VkInstance instance,
 }
 
 std::vector<const char *> SDL_WSIPlatform::get_instance_extensions() {
+// UWP-PORT: CoreWindow Vulkan surface for Dozen WSI (D-07)
 #ifdef GOPHER64_UWP
   return {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME};
 #else
