@@ -61,6 +61,29 @@ fn install_panic_hook() {
     }));
 }
 
+/// SDL log callback: route SDL's own category logging to the host log. SDL's default handler
+/// writes to stderr/OutputDebugString, which is invisible on a retail Xbox, so without this the
+/// `[sdl]` diagnostics are lost.
+unsafe extern "C" fn sdl_log_output(
+    _userdata: *mut std::ffi::c_void,
+    _category: c_int,
+    _priority: sdl3_sys::log::SDL_LogPriority,
+    message: *const c_char,
+) {
+    if !message.is_null() {
+        log(&format!(
+            "[sdl] {}",
+            unsafe { CStr::from_ptr(message) }.to_string_lossy()
+        ));
+    }
+}
+
+fn install_sdl_log_hook() {
+    unsafe {
+        sdl3_sys::log::SDL_SetLogOutputFunction(Some(sdl_log_output), std::ptr::null_mut());
+    }
+}
+
 /// Set the storage root (external drive or LocalState). Call before `gopher64_uwp_main`.
 /// `root` is a UTF-8, NUL-terminated path. A null pointer is ignored.
 ///
@@ -85,6 +108,7 @@ pub unsafe extern "C" fn gopher64_uwp_set_root(root: *const c_char) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gopher64_uwp_main(argc: c_int, argv: *mut *mut c_char) -> c_int {
     install_panic_hook();
+    install_sdl_log_hook();
     log("entry started");
 
     let (close_tx, handle) = create_runtime();

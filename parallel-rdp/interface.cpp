@@ -14,6 +14,7 @@
 #ifdef GOPHER64_UWP
 extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader();
 extern "C" void gopher64_uwp_log_native(const char *message);
+extern "C" void g64_uwp_install_granite_logger();
 static bool g64_first_swapchain_frame = false;
 #endif
 
@@ -402,6 +403,7 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
               size_t font_size, uint32_t save_state_slot) {
 // UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
+  g64_uwp_install_granite_logger(); // route Granite LOGx into the host log before any LOGE fires
   g64_first_swapchain_frame = false;
 #endif
   memset(&rdp_device, 0, sizeof(RDP_DEVICE));

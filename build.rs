@@ -144,6 +144,7 @@ fn main() {
     // links the staticlib, not rust-lld). See docs/xbox-port/05 §7. (D-14)
     if uwp {
         rdp_build.file("uwp/compat/dozen_loader.cpp");
+        rdp_build.file("uwp/compat/g64_granite_log.cpp");
         for b in [
             &mut volk_build,
             &mut rdp_build,

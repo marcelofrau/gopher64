@@ -428,3 +428,47 @@ and authorized continuing with Dozen integration. Direct/brokered ROM access rem
   `cargo fmt --check` clean, desktop `cargo check --no-default-features` and the UWP staticlib
   `cargo check` both exit 0. No Xbox test (cannot, this machine). The XAudio2 audio backend from the
   same day (commit 0953db8) is pushed to origin/uwp/main and still needs console playback validation.
+
+### PC-side P2/P3 de-risking: logging bridges, import audit, WSI review — 2026-11-05
+
+Opus agent, PC only (no VS2026/Xbox). Four PC-doable workstreams to unblock the console agent:
+
+- **Host link fix (committed 5bb7a94):** `uwp/CMakeLists.txt` did not list `xaudio2`; the XAudio2
+  backend's `rustc-link-lib=xaudio2` is only a request a staticlib records, so the host MSIX link
+  would fail with unresolved XAudio2 symbols. Added `xaudio2` to the host link line.
+- **Logging bridges (this commit).** The host only captures what flows through the Rust log
+  callback; on a retail Xbox stderr has no sink and OutputDebugString needs a debugger, so Granite
+  `LOGE/LOGW/LOGI`, SDL category logging, and Mesa-internal logs were all being LOST. Fixed the two
+  PC-doable ones:
+  - Granite/parallel-rdp: new `uwp/compat/g64_granite_log.cpp` installs a `Util::LoggingInterface`
+    that forwards to `gopher64_uwp_log_native` (→ host log, `[rdp]` prefix). Installed at the top of
+    `rdp_init` (interface.cpp). Caveat: Granite's hook is thread-local; this covers the rdp_init /
+    command thread (single-threaded RDP), not Granite's internal worker threads.
+  - SDL: `entry.rs` now calls `SDL_SetLogOutputFunction` (sdl_log_output → host log, `[sdl]` prefix)
+    at startup. Previously SDL's own AUDIO/VIDEO logs went to stderr and were lost.
+  - STILL OPEN (needs the mesa-uwp fork, console agent's territory): M-06 Mesa/Dozen driver-internal
+    log hook. `dozen_loader.cpp` already logs the loader's own diagnostics, but not Mesa internals.
+- **Static import audit (PC).** `llvm-nm` on the UWP staticlib (37 MB): no forbidden desktop DLLs
+  (user32/gdi32/winmm/shell32/...); `winmm`/`timeBeginPeriod` absent (precise_sleep replaced
+  spin_sleep successfully); only `LoadLibraryA` imported (the known benign Q-11 case, never called);
+  `XAudio2Create` present (needs the host xaudio2 link above). The staticlib introduces nothing the
+  Xbox rejects. The FINAL exe/DLL import-table audit still belongs to the console agent (needs the
+  built MSIX + `scripts/uwp/audit-imports.ps1`).
+- **Dozen WSI static review (vs mesa-uwp source).** No corruption bugs. Verified SOUND: ICD
+  negotiation (version 5 path), 8-bit-storage env-var name/timing, external-host-off timing,
+  begin/end_frame error handling, surface + extension list. Residual console-only risks the review
+  could not rule out:
+  1. `CreateSwapChainForCoreWindow` inside Mesa uses `CoreWindow::GetForCurrentThread()`; requires
+     rdp_init on the CoreWindow-owning thread AFTER Activate(). The host DOES activate and present
+     its own status frames (main.cpp:293,403) before calling run_rust (main.cpp:438) → rdp_init, and
+     SDL_WinRTApp runs the entry point synchronously on the CoreApplication thread, so the ordering
+     looks correct — but only real Dozen on console confirms it.
+  2. Q-06: the host creates a D3D11 SDL status window first, then rdp_init creates the Dozen
+     CoreWindow swapchain. Whether Dozen can create the CoreWindow swapchain after SDL's D3D11
+     renderer released its own is unproven on console.
+  3. `uwp_get_width/height()` dispatches on the CoreDispatcher and can hang/return 0x0 if the view
+     is not yet visible. Instrument around `wsi->init_simple` / the swapchain create on Xbox.
+  The new `[rdp]`/`[sdl]` log bridges are exactly what lets the console agent tell these three
+  failure modes apart from the log.
+- Verified on PC: UWP staticlib `cargo check` exit 0, desktop `cargo check --no-default-features`
+  exit 0, `cargo fmt --check` clean. No Xbox test (cannot).
