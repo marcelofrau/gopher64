@@ -730,3 +730,14 @@ link/packaging errors before the console. Findings:
   initial shader compilation, and reports sustained FPS/VI/s, image, audio and relevant Output logs.
   If still slow, profile before attributing cost to CPU, GPU, logging, Dozen or the ubershader. No
   performance fix or Xbox validation is claimed; the DXIL DLL remains a PC-only experiment.
+
+## 2026-11-05 - YODA: Visual Studio solution location clarified
+
+- For the pending Release comparison, use the `uwp-host-dxil-1.9-uber` experimental solution under
+  the physical H: build output, not the normal `uwp-host-vs2026-direct` solution with the old DXIL.
+- The source repository remains on F:; `out` and `target` are junctions to H:. CMake generates the
+  solution in the build tree. Opening the generated solution through the F: `out` junction caused
+  AppX registration error DEP0700 / 0x800701C0; opening its physical H: location succeeded on PC.
+- The user asked why the solution is not in the project folder. A future adjustment could place the
+  generated solution in a non-junction repository build directory while keeping heavy artifacts and
+  the registered AppX layout on physical H:, but that split has not been implemented or verified.
