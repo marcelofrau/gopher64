@@ -712,3 +712,21 @@ link/packaging errors before the console. Findings:
 - **Pending:** user F5 with the new solution and the same ROM; verify the override log, image, audio,
   and whether speed improves after initial compilation. The candidate DXIL remains experimental;
   neither it nor the ubershader workaround is validated on Xbox.
+
+## 2026-11-05 - YODA: ubershader improves SM64 image; Release comparison pending
+
+- The user tested the isolated DXIL 1.9 + ubershader Debug build on PC. Screenshots of the SM64 logo
+  and Mario title screen no longer show the prior severe corruption. The user reports 5–15 FPS and
+  about 15–16 VI/s. This validates only those displayed scenes; no full rendering, audio or Xbox pass
+  has been established. The user did not supply the ubershader run's Output log in this interaction.
+- Prior P0 desktop evidence: a Release build with Dozen 26.2.4 and ubershader on NVIDIA sustained
+  30 FPS / 60 VI/s in SM64's courtyard (`14-p0-handoff.md`). That was different hardware, Dozen build
+  and desktop host; it is a useful benchmark, not evidence that the present UWP port must match it.
+- The observed UWP run used Debug: `scripts/uwp/build.ps1` uses Cargo `dev` for Debug and `--release`
+  for Release. Prepared Release in the same experimental solution, without changing source or DLLs;
+  the build succeeded with warnings, including APPX0006. Debug and Release MSIX checksums match for
+  Dozen, DXIL and both SDL DLLs. Cargo reported the Release profile as optimized.
+- **Pending:** user selects Release/x64 in the same VS solution, reruns the same ROM and scene after
+  initial shader compilation, and reports sustained FPS/VI/s, image, audio and relevant Output logs.
+  If still slow, profile before attributing cost to CPU, GPU, logging, Dozen or the ubershader. No
+  performance fix or Xbox validation is claimed; the DXIL DLL remains a PC-only experiment.
