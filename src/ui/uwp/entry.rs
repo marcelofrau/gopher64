@@ -136,3 +136,96 @@ pub unsafe extern "C" fn gopher64_uwp_main(argc: c_int, argv: *mut *mut c_char) 
     log("entry returned successfully");
     0
 }
+
+// --- Config C ABI for the gamepad shell (P5) ---------------------------------
+// The shell reads/writes config.json as opaque JSON text; the schema stays owned by
+// src/ui/config.rs, which parses this same file at boot. These are pure file I/O under the
+// injected root, so they work before any game is running and never touch the renderer.
+
+static LAST_ERROR: RwLock<Option<CString>> = RwLock::new(None);
+
+fn set_last_error(message: String) {
+    if let Ok(cstring) = CString::new(message) {
+        *LAST_ERROR
+            .write()
+            .unwrap_or_else(|error| error.into_inner()) = Some(cstring);
+    }
+}
+
+/// Return the current config.json as a newly allocated UTF-8 C string (caller frees with
+/// `gopher64_uwp_string_free`). Returns null and sets the last error if it cannot be read.
+/// An absent file yields "{}" so the shell can start from defaults.
+#[unsafe(no_mangle)]
+pub extern "C" fn gopher64_uwp_config_get() -> *mut c_char {
+    let path = crate::ui::get_dirs().config_dir.join("config.json");
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => "{}".to_string(),
+        Err(err) => {
+            set_last_error(format!("config_get: {err}"));
+            return std::ptr::null_mut();
+        }
+    };
+    match CString::new(text) {
+        Ok(cstring) => cstring.into_raw(),
+        Err(err) => {
+            set_last_error(format!("config_get: {err}"));
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// Overwrite config.json with `json` (NUL-terminated UTF-8). Returns true on success; on
+/// failure returns false and sets the last error. The caller is expected to pass valid JSON;
+/// gopher64 validates the schema when it reloads at the next boot.
+///
+/// # Safety
+/// `json` must be a valid NUL-terminated C string or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gopher64_uwp_config_set(json: *const c_char) -> bool {
+    if json.is_null() {
+        set_last_error("config_set: null json".to_string());
+        return false;
+    }
+    let text = unsafe { CStr::from_ptr(json) }
+        .to_string_lossy()
+        .into_owned();
+    // Reject obviously invalid JSON before touching the file, so a bad write can't corrupt config.
+    if serde_json::from_str::<serde_json::Value>(&text).is_err() {
+        set_last_error("config_set: not valid JSON".to_string());
+        return false;
+    }
+    let dir = crate::ui::get_dirs().config_dir;
+    if let Err(err) = std::fs::create_dir_all(&dir) {
+        set_last_error(format!("config_set: {err}"));
+        return false;
+    }
+    if let Err(err) = std::fs::write(dir.join("config.json"), text) {
+        set_last_error(format!("config_set: {err}"));
+        return false;
+    }
+    true
+}
+
+/// Return the last error message set by a config call (never null; empty if none). The returned
+/// pointer is owned by Rust and valid until the next config call on any thread; copy it.
+#[unsafe(no_mangle)]
+pub extern "C" fn gopher64_uwp_last_error() -> *const c_char {
+    static EMPTY: &[u8] = b"\0";
+    let guard = LAST_ERROR.read().unwrap_or_else(|error| error.into_inner());
+    match guard.as_ref() {
+        Some(cstring) => cstring.as_ptr(),
+        None => EMPTY.as_ptr() as *const c_char,
+    }
+}
+
+/// Free a string returned by `gopher64_uwp_config_get`.
+///
+/// # Safety
+/// `ptr` must be a pointer previously returned by `gopher64_uwp_config_get`, or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn gopher64_uwp_string_free(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        drop(unsafe { CString::from_raw(ptr) });
+    }
+}

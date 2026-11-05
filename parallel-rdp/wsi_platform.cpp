@@ -78,6 +78,13 @@ std::vector<const char *> SDL_WSIPlatform::get_instance_extensions() {
 uint32_t SDL_WSIPlatform::get_surface_width() {
   int w, h;
   SDL_GetWindowSizeInPixels(window, &w, &h);
+// UWP-PORT: log the extent Granite sees; a 0-size or stale value here is a known Xbox
+// first-frame failure mode (CoreWindow not yet activated / HDMI mode unknown). (D-07)
+#ifdef GOPHER64_UWP
+  char message[96];
+  std::snprintf(message, sizeof(message), "Dozen: surface extent %dx%d", w, h);
+  gopher64_uwp_log_native(message);
+#endif
   return w;
 }
 

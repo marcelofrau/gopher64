@@ -50,7 +50,7 @@ stateDiagram-v2
 | Navigation | `ImGuiConfigFlags_NavEnableGamepad`, keyboard nav off, `ImGuiConfigFlags_NoMouseCursorChange` (`SDL_SetCursor` throws on Xbox) |
 | Fonts/scale | Scale for 10-foot UI (≈ 2× at 1080p); embed Roboto (gopher64 already embeds RobotoMono for the OSD) |
 | ROM browser | Drive list (`GetLogicalDrives`) + `FindFirstFileExFromAppW`, filters `z64/n64/v64/zip/7z`, remembers last folder, recent list |
-| Settings | Reads/writes gopher64's `config.json` via the Rust side (C ABI `gopher64_uwp_config_get/set(json)`), so the schema stays owned by `src/ui/config.rs` |
+| Settings | Reads/writes gopher64's `config.json` via the Rust side (C ABI `gopher64_uwp_config_get/set(json)`, `gopher64_uwp_last_error`, `gopher64_uwp_string_free` — **implemented 2026-11-05** in `src/ui/uwp/entry.rs`; plain file I/O, renderer-independent), so the schema stays owned by `src/ui/config.rs` |
 | Input page | Shows bound profile per port, "Configure" runs gopher64's existing profile flow (`--configure-input-profile`) in-process |
 | Errors | Last error string from Rust (`gopher64_uwp_last_error()`) shown in a modal |
 | Hand-over to game | Destroy ImGui context + `SDL_Renderer` (releases the D3D11 swapchain on the CoreWindow), then call `gopher64_uwp_main(argc, argv)`; on return re-create renderer + shell |

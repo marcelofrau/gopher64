@@ -472,3 +472,33 @@ Opus agent, PC only (no VS2026/Xbox). Four PC-doable workstreams to unblock the 
   failure modes apart from the log.
 - Verified on PC: UWP staticlib `cargo check` exit 0, desktop `cargo check --no-default-features`
   exit 0, `cargo fmt --check` clean. No Xbox test (cannot).
+
+### Rendering bring-up guide, swapchain instrumentation, config C ABI — 2026-11-05
+
+Opus agent, PC only. Prep so the console agent can attack first-frame rendering (the recurring
+"initializes but nothing on screen" problem) with direction instead of trial-and-error.
+
+- **New doc `19-rendering-bringup-xbox.md`** (linked from the P3 checklist): the three first-frame
+  failure modes mapped to exact `[rdp]`/`[sdl]` log lines, the Xbox-proven activation/present rules
+  (pump events early so CoreWindow::Activate fires; never run two swapchains on one CoreWindow;
+  trust Mesa's STRETCH/HDMI-extent/no-waitable/no-tearing choices), and an ordered first-console
+  test that does the D3D11→Dozen hand-over (Q-06) isolated and FIRST. Distilled from Ymir (D3D12
+  CoreWindow, proven on Series X) and scummvm-uwp (documented the two-renderer deadlock as a
+  "do not"). Note: Ymir does NOT use Vulkan/Dozen on Xbox (native D3D12), so it is an analogue, not
+  a Dozen proof.
+- **Swapchain instrumentation** (`parallel-rdp/wsi_platform.cpp`): log the surface extent on UWP
+  (`Dozen: surface extent WxH`) — a 0x0/stale value is failure mode #3. Surface-create result and
+  first-touched-frame logging already existed; together they cover all three modes.
+- **Config C ABI for the P5 shell** (`src/ui/uwp/entry.rs`): `gopher64_uwp_config_get` (returns
+  config.json text, "{}" if absent), `gopher64_uwp_config_set` (validates JSON then writes),
+  `gopher64_uwp_last_error`, `gopher64_uwp_string_free`. Plain file I/O under the injected root,
+  renderer-independent — the Settings page of the shell can be built on these now. Schema stays
+  owned by src/ui/config.rs (it parses the same file at boot).
+- **GUI recommendation:** the shell's logic is isolated from the emulator core, but its PRESENTATION
+  is not — it shares the CoreWindow with Dozen, and the D3D11→Dozen hand-over (Q-06) is the proven
+  failure mode. So the PC agent provided the renderer-independent piece (config C ABI) and the
+  guide; the visual ImGui shell is best done on the console machine (VS2026 + reuse Ymir's shell:
+  commits 9a42e339 "Add the Xbox shell, gamepad-first", bc575c0a gamepad nav, plus its file picker).
+  Do NOT build the shell's game hand-over before Q-06 is validated on console.
+- Verified on PC: UWP staticlib + desktop cargo check and fmt green. Config symbols compile; no
+  Xbox test. No logic in the emulator core changed.

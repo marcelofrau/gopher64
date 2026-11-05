@@ -134,6 +134,12 @@ original two-mode criterion passed. Intel and Xbox validation remain separate.
 
 **Goal:** SM64 title screen on the TV via Dozen.
 
+> **Console bring-up guide:** [19 — Rendering bring-up on Xbox](19-rendering-bringup-xbox.md) — the
+> three first-frame failure modes, how to read them from the `[rdp]`/`[sdl]` log, the activation /
+> present pattern proven on Xbox, and the ordered first-console test (do the D3D11→Dozen hand-over,
+> Q-06, isolated and first). Logging bridges + swapchain instrumentation are already in place; M-06
+> (Mesa driver-internal log hook) is still the top remaining item.
+
 - [ ] Fork mesa-uwp → branch `gopher64/dzn-xbox`; build UWP Dozen with meson-uwp (`-Dvulkan-drivers=microsoft-experimental -Dgallium-drivers= -Dc_args="/D _XBOX_UWP" -Dcpp_args="/D _XBOX_UWP"`)
 - [ ] (Shortcut for first light) try RetroArch's prebuilt mesa-uwp `vulkan_dzn.dll` + `dxil.dll`
 - [ ] Port M-06 (log hook) first — every later step depends on Mesa logs in our log file
