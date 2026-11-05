@@ -2,6 +2,10 @@ param([string]$BuildDir)
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../common.ps1')
+$buildScript = Get-Content -Raw (Join-Path $PSScriptRoot '../../../build.rs')
+if (-not $buildScript.Contains('cargo::rerun-if-changed=uwp/audio')) {
+    throw 'Cargo must track UWP audio sources and headers.'
+}
 if (-not $BuildDir) {
     $root = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
     $BuildDir = Get-UwpHostBuildDir $root (Get-UwpVisualStudio).Version

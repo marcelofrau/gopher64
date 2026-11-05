@@ -741,3 +741,23 @@ link/packaging errors before the console. Findings:
 - The user asked why the solution is not in the project folder. A future adjustment could place the
   generated solution in a non-junction repository build directory while keeping heavy artifacts and
   the registered AppX layout on physical H:, but that split has not been implemented or verified.
+
+## 2026-11-05 - YODA: Release audio investigation
+
+- The user reports 30 FPS / 60 VI/s in Release, but periodic audio stutters and high pitch.
+- The UWP source voice kept its open-time rate while the resampler ignored later N64 input-rate
+  changes; unlike SDL stream conversion, this can play the source at the wrong speed and drain it.
+  The shim now uses `input_rate / voice_rate * frequency_ratio`, validates stereo rates, and reports
+  input/voice rates plus aggregate underrun, overflow and submit-failure counters every ~5 seconds.
+  Formatting and logging are outside the audio lock and callback; the first interval includes startup.
+- Queued samples still use the latest rate rather than a rate per segment. SDL's get-callback shim is
+  also a no-op, and Rust may discard data before the shim: these are pending, not proven causes.
+- A PC-only C++ test exercises the actual resampler, rate changes, invalid formats and counters;
+  an isolated mutation restoring the old step failed the test as expected. Release packaging passed
+  with warnings. Import-module audit passed but is not Store/API-level or Xbox certification.
+- Found and fixed a Cargo dependency omission: `uwp/audio` was not tracked, so native-only changes
+  could reuse a stale Rust library. An actual Release build after touching the header and again after
+  touching the C++ file rebuilt the library and relinked the host both times. Structural test passed.
+- **Pending:** user reruns Release/x64 using the same experimental solution, listens for pitch and
+  stutters, and shares several `audio: input=` lines after startup. No real playback was run by the
+  agent; output DLLs and renderer are unchanged, and DXIL 1.9 remains experimental on Xbox.

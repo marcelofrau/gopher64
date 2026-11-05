@@ -32,7 +32,7 @@ void g64_audio_put(G64Audio *audio, const void *data, int bytes);
 int g64_audio_queued(G64Audio *audio);
 
 // Change the S16LE format (freq/channels), mirroring SDL_SetAudioStreamFormat.
-void g64_audio_set_format(G64Audio *audio, int freq, int channels);
+int g64_audio_set_format(G64Audio *audio, int freq, int channels);
 
 // Linear output gain [0, 2]; and frequency ratio for drift control [0.995, 1.005].
 void g64_audio_set_gain(G64Audio *audio, float gain);

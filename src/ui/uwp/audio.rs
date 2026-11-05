@@ -76,7 +76,9 @@ pub unsafe fn SDL_SetAudioStreamFormat(
     _dst_spec: *const SDL_AudioSpec,
 ) -> bool {
     if !src_spec.is_null() {
-        unsafe { ffi::g64_audio_set_format(stream, (*src_spec).freq, (*src_spec).channels) };
+        return unsafe {
+            ffi::g64_audio_set_format(stream, (*src_spec).freq, (*src_spec).channels) != 0
+        };
     }
     true
 }
