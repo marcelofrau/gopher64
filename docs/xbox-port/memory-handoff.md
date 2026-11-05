@@ -665,3 +665,25 @@ link/packaging errors before the console. Findings:
   is handled, repeats, or terminates. Only then choose a controlled PC A/B (one variable at a time,
   starting from the same ROM and renderer); explain the expected outcome before running it. No Xbox
   test and no runtime-code change were performed by the agent.
+
+## 2026-11-05 - YODA: fatal scanout exception and isolated DXIL A/B
+
+- The user continued in Visual Studio: the window was black and the exception became an unhandled
+  `0xC0000005` at the same `dxil.dll -> vulkan_dzn.dll -> vkCreateGraphicsPipelines ->
+  aa_fetch_stage` stack. No game image appeared. The old gray-window stall is not the current state.
+- Hypothesis, not a diagnosis: the older validator may fail on DXIL emitted by Dozen. Prepared a
+  separate **PC-only** Debug solution using Microsoft's signed Windows SDK `dxil.dll` 1.9.2602.17;
+  the baseline solution and its DLL were not changed. Its UWP and Xbox compatibility is unverified.
+- Experiment artifacts are under YODA's H: build area: the `dxil-1.9` experiment contains the
+  candidate DLL and the same Dozen binary; `uwp-host-dxil-1.9-ab` contains the separate VS solution.
+  The package uses the same development identity and version as baseline and shares LocalState;
+  do not uninstall the existing app. Restore baseline by opening and running its direct solution.
+- Checked: the experimental MSIX built successfully; Dozen and SDL DLL hashes match baseline and
+  DXIL differs. The executable `.text` hashes match; complete executable and `.rdata` do not, so the
+  builds are not byte-identical. The VS Rust dependency structural test passed. The candidate's
+  PE imports include ETW-only `ADVAPI32` and release UCRT; this is not full API certification.
+- The first configure attempt passed an unquoted PowerShell value `10.0`, cached it as `10` and
+  failed. Left that agent-created directory untouched and configured a new `-ab` directory with
+  the value quoted. The successful build emitted existing `getenv`, `LNK4075` and `APPX0006` warnings.
+- **Pending:** the user should open the experimental solution, F5 the same Mario 64 ROM and paste
+  output and any exception stack. The experiment is not a permanent fix and must not go to Xbox.
