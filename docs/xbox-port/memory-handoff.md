@@ -687,3 +687,28 @@ link/packaging errors before the console. Findings:
   the value quoted. The successful build emitted existing `getenv`, `LNK4075` and `APPX0006` warnings.
 - **Pending:** the user should open the experimental solution, F5 the same Mario 64 ROM and paste
   output and any exception stack. The experiment is not a permanent fix and must not go to Xbox.
+
+## 2026-11-05 - YODA: DXIL A/B passes crash; ubershader experiment
+
+- The user tested the isolated DXIL 1.9 PC solution with the same Dozen: the prior access violation
+  did not recur in the supplied log, the game reached its menu, but screenshots show severe tiled
+  corruption and the user reports slowness. This is not a functional graphics or performance pass.
+  The log confirms successful synchronous shader compilations, including graphics after the point
+  where the old DLL crashed; it does not establish sustained FPS, cause of slowness, or audio output.
+- Prior P0 evidence in `14-p0-handoff.md`: Dozen 26.2.4 default produced corruption; on NVIDIA,
+  `PARALLEL_RDP_UBERSHADER=1` rendered SM64 correctly and passed 237 reduced RDP suites. Intel still
+  corrupted and UWP currently uses Dozen 25.3.3, so those results do not prove this configuration.
+- The UWP renderer defaulted ubershader to false and its log did not show an override. The UWP
+  translation-unit wrapper now routes renderer environment lookups through the existing UWP shim,
+  which forces the P0 ubershader setting; other platforms' renderer build is unchanged. This is an
+  unverified workaround, not a root-cause claim. Check the runtime log for `Overriding ubershader = 1`.
+- Prepared a separate PC-only `uwp-host-dxil-1.9-uber` solution in the H: build area. Its Debug
+  MSIX built successfully; Dozen, DXIL 1.9 and SDL hashes match the preceding A/B package. The UWP
+  shim's standalone Windows C++ assertions and VS dependency structural test passed. Build warnings
+  remain, including `LNK4075` and `APPX0006`. No manual app or Xbox test was run by the agent.
+- All generated solutions rebuild from the same current source and Rust library; reopening the old
+  A/B solution and building now also picks up the ubershader change. Existing MSIX artifacts remain
+  as historical evidence, but an old solution is not a stable way to rerun the previous baseline.
+- **Pending:** user F5 with the new solution and the same ROM; verify the override log, image, audio,
+  and whether speed improves after initial compilation. The candidate DXIL remains experimental;
+  neither it nor the ubershader workaround is validated on Xbox.

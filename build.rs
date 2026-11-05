@@ -34,7 +34,11 @@ fn main() {
             "parallel-rdp/parallel-rdp-standalone/parallel-rdp/rdp_device.cpp"
         })
         .file("parallel-rdp/parallel-rdp-standalone/parallel-rdp/rdp_dump_write.cpp")
-        .file("parallel-rdp/parallel-rdp-standalone/parallel-rdp/rdp_renderer.cpp")
+        .file(if uwp {
+            "uwp/compat/rdp_renderer_uwp.cpp"
+        } else {
+            "parallel-rdp/parallel-rdp-standalone/parallel-rdp/rdp_renderer.cpp"
+        })
         .file("parallel-rdp/parallel-rdp-standalone/parallel-rdp/video_interface.cpp")
         .file("parallel-rdp/parallel-rdp-standalone/vulkan/breadcrumbs.cpp")
         .file("parallel-rdp/parallel-rdp-standalone/vulkan/buffer.cpp")

@@ -6,6 +6,8 @@
 #include <string>
 
 inline const char* g64_uwp_rdp_getenv(const char* name) {
+    // P0 NVIDIA Dozen rendered correctly with ubershader; Xbox remains unverified.
+    if (std::strcmp(name, "PARALLEL_RDP_UBERSHADER") == 0) return "1";
     if (std::strcmp(name, "PARALLEL_RDP_ALLOW_EXTERNAL_HOST") == 0)
         return "0";
 
