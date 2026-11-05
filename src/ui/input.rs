@@ -15,8 +15,6 @@ pub struct Controllers {
     pub joystick: *mut sdl3_sys::joystick::SDL_Joystick,
     pub guid: sdl3_sys::guid::SDL_GUID,
     pub last_key_state: u32,
-    #[cfg(target_vendor = "uwp")]
-    pub gamepad_start_pressed: bool,
 }
 
 #[derive(Default, PartialEq, Copy, Clone, serde::Serialize, serde::Deserialize)]
@@ -297,50 +295,14 @@ pub fn get_controller_paths() -> Vec<String> {
     }
 }
 
-#[cfg(target_vendor = "uwp")]
-fn auto_bind_player_one(ui: &mut ui::Ui, joystick_id: sdl3_sys::joystick::SDL_JoystickID) {
-    let config = &ui.config.input;
-    let controller = &ui.input.controllers[0];
-    let gamepad_profile = config
-        .input_profiles
-        .get(&config.input_profile_binding[0])
-        .is_some_and(|profile| !profile.dinput);
-    if !ui::uwp::gamepad_policy::can_auto_assign(
-        config.controller_enabled[0],
-        config.controller_assignment.iter().any(Option::is_some),
-        gamepad_profile,
-        !controller.game_controller.is_null() || !controller.joystick.is_null(),
-    ) || !unsafe { sdl3_sys::gamepad::SDL_IsGamepad(joystick_id) }
-        || !joystick_available(joystick_id)
-    {
-        return;
-    }
-
-    let gamepad = unsafe { sdl3_sys::gamepad::SDL_OpenGamepad(joystick_id) };
-    if gamepad.is_null() {
-        let error = unsafe { std::ffi::CStr::from_ptr(sdl3_sys::error::SDL_GetError()) };
-        ui::uwp::entry::log(&format!(
-            "input: player 1 gamepad open failed: {}",
-            error.to_string_lossy()
-        ));
-        return;
-    }
-    ui.input.controllers[0].game_controller = gamepad;
-    ui.input.controllers[0].guid =
-        unsafe { sdl3_sys::gamepad::SDL_GetGamepadGUIDForID(joystick_id) };
-    ui::uwp::entry::log(&format!(
-        "input: player 1 automatically opened gamepad {}",
-        u32::from(joystick_id)
-    ));
-}
-
 fn handle_joystick_events(ui: &mut ui::Ui) {
     let joystick_event = unsafe { ui::video::get_joystick_event() };
     if joystick_event.joystick_id != 0 {
         let joystick_id = sdl3_sys::joystick::SDL_JoystickID(joystick_event.joystick_id);
+        // UWP-PORT: assign an unconfigured gamepad on connection (D-04).
         #[cfg(target_vendor = "uwp")]
         if joystick_event.connected {
-            auto_bind_player_one(ui, joystick_id);
+            ui::uwp::gamepad::auto_bind_player_one(ui, joystick_id);
         }
         for (i, controller) in ui.input.controllers.iter_mut().enumerate() {
             if joystick_event.connected {
@@ -383,10 +345,9 @@ fn handle_joystick_events(ui: &mut ui::Ui) {
                     && controller.game_controller
                         == unsafe { sdl3_sys::gamepad::SDL_GetGamepadFromID(joystick_id) }
                 {
+                    // UWP-PORT: record gamepad disconnection (D-04).
                     #[cfg(target_vendor = "uwp")]
-                    if i == 0 {
-                        ui::uwp::entry::log("input: player 1 gamepad disconnected");
-                    }
+                    ui::uwp::gamepad::disconnected(i);
                     unsafe { sdl3_sys::gamepad::SDL_CloseGamepad(controller.game_controller) };
                     controller.game_controller = std::ptr::null_mut();
                 }
@@ -482,23 +443,9 @@ pub fn get(ui: &mut ui::Ui, channel: usize) -> InputData {
     keys |= (x.round() as i8 as u8 as u32) << X_AXIS_SHIFT;
     keys |= (y.round() as i8 as u8 as u32) << Y_AXIS_SHIFT;
 
+    // UWP-PORT: log the gamepad Start edge for bring-up (D-04).
     #[cfg(target_vendor = "uwp")]
-    if channel == 0 {
-        let pressed = !controller.is_null()
-            && unsafe {
-                sdl3_sys::gamepad::SDL_GetGamepadButton(
-                    controller,
-                    sdl3_sys::gamepad::SDL_GAMEPAD_BUTTON_START,
-                )
-            };
-        if pressed && !ui.input.controllers[channel].gamepad_start_pressed {
-            ui::uwp::entry::log(&format!(
-                "input: gamepad Start pressed; N64 Start={}",
-                keys & (1 << ui::input_profile::START_BUTTON) != 0
-            ));
-        }
-        ui.input.controllers[channel].gamepad_start_pressed = pressed;
-    }
+    ui::uwp::gamepad::trace_start(channel, controller, keys);
 
     let last_key_state = ui.input.controllers[channel].last_key_state;
     ui.input.controllers[channel].last_key_state = keys;
@@ -658,21 +605,9 @@ pub fn init(ui: &mut ui::Ui) {
             }
         }
     }
+    // UWP-PORT: initialize default gamepad binding (D-04).
     #[cfg(target_vendor = "uwp")]
-    {
-        let joysticks = get_joysticks();
-        let gamepads = joysticks
-            .iter()
-            .filter(|id| unsafe { sdl3_sys::gamepad::SDL_IsGamepad(**id) })
-            .count();
-        ui::uwp::entry::log(&format!(
-            "input: detected {} joystick(s), {gamepads} SDL gamepad(s)",
-            joysticks.len()
-        ));
-        for joystick_id in joysticks {
-            auto_bind_player_one(ui, joystick_id);
-        }
-    }
+    ui::uwp::gamepad::initialize(ui);
 }
 
 pub fn close(ui: &mut ui::Ui) {

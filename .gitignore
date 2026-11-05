@@ -13,11 +13,5 @@ target/
 # Added by cargo
 
 /target
-/out/uwp-deps/
-/out/uwp-deps-build/
-/out/uwp-host-vs*/
-/out/uwp-sdl-symbols-vs*/
-/out/uwp-sdl-patched-vs*/
-/out/uwp-deps-symbols/
-/out/desktop-p2-test-*/
+/out/
 /.cargo/uwp-links.toml

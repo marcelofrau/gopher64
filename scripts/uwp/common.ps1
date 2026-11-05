@@ -33,6 +33,32 @@ function Get-UwpHostBuildDir([string]$Root, [string]$Version) {
     return Join-Path $out "uwp-host-vs$Version"
 }
 
+function Assert-UwpRuntimeFiles($Zip) {
+    foreach ($name in @('gopher64-uwp.exe', 'SDL3.dll', 'SDL3_ttf.dll', 'vulkan_dzn.dll', 'dxil.dll')) {
+        if (-not $Zip.GetEntry($name)) { throw "Package is missing $name" }
+    }
+}
+
+function Get-UwpDozenDir([string]$Root, [string]$BuildDir, [string]$Explicit) {
+    if ($Explicit) { return $Explicit }
+    $preferred = Join-Path (Split-Path -Parent $BuildDir) 'uwp-dozen'
+    if (Test-Path -LiteralPath $preferred -PathType Container) {
+        $files = @(@('vulkan_dzn.dll', 'dxil.dll') | Where-Object { -not (Test-Path -LiteralPath (Join-Path $preferred $_) -PathType Leaf) })
+        if ($files.Count -eq 0) { return $preferred }
+        Write-Warning "Local Dozen pair is incomplete: $($files -join ', '). Trying the legacy source."
+    }
+    $legacy = Join-Path $Root '../scummvm-uwp/extern/retroarch/pkg/msvc-uwp/RetroArch-msvcUWP/MESA/x64'
+    if (Test-Path -LiteralPath $legacy -PathType Container) {
+        foreach ($name in @('vulkan_dzn.dll', 'dxil.dll')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $legacy $name) -PathType Leaf)) {
+                throw "Legacy Dozen directory is missing $name."
+            }
+        }
+        return $legacy
+    }
+    return ''
+}
+
 function Get-UwpVisualStudio {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (-not (Test-Path $vswhere)) { throw 'vswhere.exe not found; install Visual Studio with the UWP C++ tools.' }

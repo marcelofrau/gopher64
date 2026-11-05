@@ -143,7 +143,8 @@ Status: ✔ landed (P1 blocks 1–6) · ○ planned (P1 block 8 / P2+).
 | `.cargo/config.toml` | `[target.x86_64-uwp-windows-msvc]` section + target CC vars (appended at end) | D-05, D-14 | ~10 | ✔ |
 | `build.rs` | UWP compiler/compatibility setup and port-owned RDP environment wrapper; no submodule edits | D-14, D-07 | growing | ✔ |
 | `src/lib.rs` | `cfg` swap of `mod netplay` to the stub via `#[path]` (block 8 will add the UWP entry module) | D-09, D-02 | ~7 | ✔ |
-| `src/ui.rs` | `mod uwp` line; `get_dirs()` UWP delegation; `WEB_CLIENT` cfg widened | D-10, D-11, D-04 | ~10 | ✔ |
+| `src/ui.rs` | `mod uwp`; `get_dirs()` delegation; `WEB_CLIENT` cfg; UWP SDL input hints | D-10, D-11, D-04 | growing | ✔ |
+| `src/ui/input.rs` | UWP-only gamepad init, hotplug and diagnostic delegates into the port | D-04 | growing | ✔ (PC controller untested) |
 | `src/ui/audio.rs` | Gated `use … as aud` alias at the top selecting the XAudio2 shim (`src/ui/uwp/audio.rs`) on UWP vs `sdl3_sys::audio` elsewhere; call sites are a uniform `aud::` prefix. Fixes the SDL WinRT `SDL_OpenAudioDeviceStream` deadlock. | D-08 | ~32 | ✔ |
 | `src/ui.rs` (Audio.audio_stream) | gated field type: SDL stream vs XAudio2 shim handle | D-08 | ~4 | ✔ |
 | `build.rs` (xaudio2) | compile `uwp/audio/g64_xaudio2.cpp`, link `xaudio2`, bindgen its header (inside the `uwp` block) | D-08 | ~25 | ✔ |
@@ -154,13 +155,20 @@ Status: ✔ landed (P1 blocks 1–6) · ○ planned (P1 block 8 / P2+).
 | `src/ui/netplay.rs` | none — already `cfg(feature = "gui")`, excluded by `--no-default-features` | D-09 | 0 | ✔ |
 | `src/retroachievements.rs` | Discord `use`/`init_rich_presence` gated + no-op; inner `cfg_attr(uwp, allow(dead_code))` for the Discord-only binding | D-09 | ~19 | ✔ |
 | `src/ui/usb.rs` | Gated | D-09 | ~3 | ○ |
-| `parallel-rdp/interface.cpp` | UWP-only Dozen loader, error logging and WSI frame diagnostics; suspend-teardown remains pending | D-07, D-18 | growing | ✔ (experimental) |
+| `parallel-rdp/interface.cpp` | UWP-only Dozen/WSI diagnostics and gamepad-added relay; suspend-teardown remains pending | D-04, D-07, D-18 | growing | ✔ (experimental) |
 | `parallel-rdp/wsi_platform.cpp` | UWP-only Mesa CoreWindow surface creation/destruction | D-07 | ~35 | ✔ (PC surface probe) |
-| **Total (landed, P1 b1–6)** | **8 upstream files** | | **~130** | |
+| **Historical P1 b1–6 snapshot (not current total)** | **8 upstream files** | | **~130** | |
 
 Port-owned files added: `scripts/uwp/build-deps.ps1`, `scripts/uwp/gen-links.ps1`, `uwp/compat/g64_uwp_compat.h`, `src/ui/uwp/{mod,time,netplay_stub}.rs`.
 
 ### Fidelity deviations requiring ongoing review
+
+**2026-11-05 review:** before the final ignore cleanup, the reviewer found 16 previously existing
+files and 881 changed lines, over the 400-line budget against local `main`. The upstream remote was not configured, so that is not
+an authoritative upstream comparison. Existing shared ROM/RDRAM fixes remain open exceptions.
+Recent gamepad implementation was moved into port-owned files with marked UWP-only hooks; this
+reduces new drift but does not resolve the historical budget breach. Prior nonconforming commit
+subjects are preserved because the history is already published; future commits use `uwp:`.
 
 Some P2/P3 changes committed on this branch are **not pure cfg-only hooks**. A 2026-11-05 cleanup
 pass added the missing `UWP-PORT` markers (C++ Dozen/WSI blocks, `video.rs`/`device.rs` gated

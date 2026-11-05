@@ -18,3 +18,17 @@ if (Test-UwpAllowedAdvapiImports @('    ADVAPI32.dll')) { throw 'Unparsed import
 if (Test-UwpAllowedAdvapiImports @('    ADVAPI32.dll', '              2A [NONAME]')) { throw 'Ordinal imports must be rejected.' }
 if (Test-UwpAllowedAdvapiImports @('    ADVAPI32.dll', '             10C EventRegister', '             Ordinal 102')) { throw 'Mixed named and ordinal imports must be rejected.' }
 Write-Host 'Advapi32 ETW allowlist checks passed.'
+
+$names = @('gopher64-uwp.exe', 'SDL3.dll', 'SDL3_ttf.dll', 'vulkan_dzn.dll', 'dxil.dll')
+foreach ($missing in @('') + $names) {
+    $stream = [IO.MemoryStream]::new()
+    $zip = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Update)
+    try {
+        foreach ($name in $names) { if ($name -ne $missing) { $null = $zip.CreateEntry($name) } }
+        $failure = $null
+        try { Assert-UwpRuntimeFiles $zip } catch { $failure = $_.Exception.Message }
+        if ($missing -and $failure -ne "Package is missing $missing") { throw "Missing $missing was not detected" }
+        if (-not $missing -and $failure) { throw "Complete package rejected: $failure" }
+    } finally { $zip.Dispose(); $stream.Dispose() }
+}
+Write-Host 'Required runtime package file checks passed.'

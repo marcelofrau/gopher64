@@ -14,10 +14,15 @@ Set-StrictMode -Version Latest
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $vs = Get-UwpVisualStudio
 $build = Get-UwpHostBuildDir $root $vs.Version
-$candidate = Join-Path $root '../scummvm-uwp/extern/retroarch/pkg/msvc-uwp/RetroArch-msvcUWP/MESA/x64'
-if (-not $DozenDir -and (Test-Path -LiteralPath (Join-Path $candidate 'vulkan_dzn.dll'))) { $DozenDir = $candidate }
+$explicitDozen = $DozenDir
+$DozenDir = Get-UwpDozenDir $root $build $DozenDir
 if ($DozenDir) {
+    $preferred = Join-Path (Split-Path -Parent $build) 'uwp-dozen'
+    if (-not $explicitDozen -and $DozenDir -ne $preferred) {
+        Write-Warning 'Using the legacy Dozen pair; it may differ from the PC-tested pair.'
+    }
     $DozenDir = (Resolve-Path -LiteralPath $DozenDir).Path
+    Write-Host "Dozen directory: $DozenDir"
     foreach ($dll in @('vulkan_dzn.dll', 'dxil.dll')) {
         $path = Join-Path $DozenDir $dll
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing Dozen input: $path" }

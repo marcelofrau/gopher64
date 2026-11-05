@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
+    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
     [switch]$SkipDependencies,
     [switch]$InitSubmodules
 )

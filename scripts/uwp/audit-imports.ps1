@@ -17,9 +17,7 @@ New-Item -ItemType Directory -Path $audit | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Package).Path)
 try {
-    foreach ($name in @('gopher64-uwp.exe', 'SDL3.dll', 'SDL3_ttf.dll')) {
-        if (-not $zip.GetEntry($name)) { throw "Package is missing $name" }
-    }
+    Assert-UwpRuntimeFiles $zip
     $names = @('gopher64-uwp.exe') + @($zip.Entries | Where-Object { $_.FullName -match '^[^/\\]+\.dll$' } | ForEach-Object FullName)
     foreach ($name in $names) {
         $entry = $zip.GetEntry($name)

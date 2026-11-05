@@ -801,3 +801,30 @@ link/packaging errors before the console. Findings:
   load outside its AppX runtime; this test does not validate UWP, WGI, real input or Xbox.
 - Pending: user tests the experimental Release on PC, reports input logs, Start, other controls,
   reconnect, graphics and audio; only the user performs Xbox deployment when ready.
+
+## 2026-11-05 - YODA: consolidated primary solution
+
+- The user requested one primary solution for tomorrow's Xbox test and clarification of DXIL.
+  The direct VS 2026 host solution is the primary one; the old A/B solutions remain untouched.
+- The tested pair was copied into the generated `out/uwp-dozen` directory and hashes verified.
+  Build selection preserves explicit overrides, prefers complete local pairs, and warns before
+  falling back to the legacy source. Incomplete local pairs are never silently selected.
+- The entire generated `out/` tree is now ignored to prevent accidental commits of caches,
+  binaries and local proof scripts. Existing contents were preserved, not deleted or modified.
+- `open-vs.ps1` now builds Release by default; the user must still select Release in VS. Import
+  audit requires both Dozen DLLs. The main Release MSIX passed the audit and its DLL hashes match
+  the PC-tested pair; VCLibs and a development certificate are packaged alongside it.
+- The Release deployment layout has not yet been created by F5; an older Debug layout still has
+  the old DXIL. Neither layout was deleted or altered; select Release and let VS deploy it.
+- The build still reports `APPX0006` for `runFullTrust`; import-module checks do not prove Xbox
+  API, dynamic-load, certificate trust, Store, or console deployment compatibility.
+- Fidelity review found new gamepad implementation in upstream files and historical budget
+  violations. Recent logic was moved to port-owned modules with marked hooks; the historical
+  exceptions remain. The unpushed gamepad subject was corrected; published history was not rewritten.
+- Final staged-diff review passed for new changes; the historical fidelity budget remains exceeded
+  against local `main`, and an authoritative `upstream/main` comparison is unavailable.
+- Reviewer also noted a potential resampler phase edge case after underrun at step above one.
+  The user reported working audio; no regression was established, so this is not changed here.
+- After the relay refactor, the desktop SDL virtual gamepad test and a simulated scheduling-failure
+  ownership/logging test passed. Neither proves WGI, real input, final PC playback or Xbox behavior.
+  See [21](21-first-xbox-smoke-test.md) for the next manual test and log checklist.

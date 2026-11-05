@@ -12,6 +12,7 @@
 
 // UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
+#include "../uwp/compat/g64_gamepad_event.h"
 extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader();
 extern "C" void gopher64_uwp_log_native(const char *message);
 extern "C" void g64_uwp_install_granite_logger();
@@ -316,12 +317,10 @@ bool sdl_event_filter(void *userdata, SDL_Event *event) {
     joystick_event->joystick_id = event->jdevice.which;
     joystick_event->connected = true;
     SDL_RunOnMainThread(add_joystick_event, joystick_event, false);
+// UWP-PORT: notice mappings that become available after joystick arrival (D-04).
 #ifdef GOPHER64_UWP
   } else if (event->type == SDL_EVENT_GAMEPAD_ADDED) {
-    JoystickEvent *joystick_event = new JoystickEvent;
-    joystick_event->joystick_id = event->gdevice.which;
-    joystick_event->connected = true;
-    SDL_RunOnMainThread(add_joystick_event, joystick_event, false);
+    g64_uwp_queue_gamepad_event(event->gdevice.which, add_joystick_event);
 #endif
   } else if (event->type == SDL_EVENT_JOYSTICK_REMOVED) {
     JoystickEvent *joystick_event = new JoystickEvent;

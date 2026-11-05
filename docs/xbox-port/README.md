@@ -1,8 +1,8 @@
 # Gopher64 on Xbox Series (Dev Mode / UWP) — Port Plan
 
-> **Status:** P2 host and package build and run on PC; Xbox validation and `rdp_init` remain incomplete. See [the implementation handoff](17-p2-implementation-handoff.md) and [cross-machine work journal](memory-handoff.md).
+> **Status:** A PC UWP experiment reached game rendering, 30 FPS / 60 VI/s and user-confirmed audio. The final consolidated build and real gamepad are not yet tested; Xbox remains untested. See the [first Xbox smoke test](21-first-xbox-smoke-test.md) and [cross-machine work journal](memory-handoff.md).
 > **Plan date:** 2026-10-28
-> **Last local build verification:** 2026-11-04
+> **Last local build verification:** 2026-11-05
 > **Upstream base:** `gopher64/gopher64@87385e7` (v1.1.42)
 > **Fork:** `marcelofrau/gopher64`
 > **Target:** Xbox Series X|S in Developer Mode, packaged as a UWP `.msix`.
@@ -70,6 +70,7 @@ flowchart LR
 | 18 | [Dozen P3 work plan](18-dozen-p3-work-plan.md) | Active P3 Vulkan/Dozen integration plan, baselines and incremental checks |
 | 19 | [Rendering bring-up on Xbox](19-rendering-bringup-xbox.md) | First-frame failure modes, log reading guide, console test order |
 | 20 | [GUI design vision](20-gui-design-vision.md) | Visual identity, menu scope and asset strategy for the P5 gamepad shell |
+| 21 | [First Xbox smoke test](21-first-xbox-smoke-test.md) | Primary solution, local Dozen/DXIL inputs, manual run and log markers |
 
 ---
 

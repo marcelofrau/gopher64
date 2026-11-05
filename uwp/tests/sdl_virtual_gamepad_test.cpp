@@ -1,14 +1,28 @@
 #include <SDL3/SDL.h>
 #include <cstdio>
+#include "../compat/g64_gamepad_event.h"
 
 #define CHECK(expr) do { if (!(expr)) { std::fprintf(stderr, "%s: %s\n", #expr, SDL_GetError()); return 1; } } while (0)
 
 struct Events { unsigned joystick_added = 0, gamepad_added = 0, joystick_removed = 0; };
+static SDL_JoystickID bridged_id = 0;
+static bool bridged_connected = false;
+static unsigned bridge_errors = 0;
+extern "C" void gopher64_uwp_log_native(const char*) { ++bridge_errors; }
+static void SDLCALL receive_gamepad(void* data) {
+    auto* event = static_cast<JoystickEvent*>(data);
+    bridged_id = event->joystick_id;
+    bridged_connected = event->connected;
+    delete event;
+}
 
 static bool SDLCALL watch(void* data, SDL_Event* event) {
     auto& events = *static_cast<Events*>(data);
     if (event->type == SDL_EVENT_JOYSTICK_ADDED) ++events.joystick_added;
-    if (event->type == SDL_EVENT_GAMEPAD_ADDED) ++events.gamepad_added;
+    if (event->type == SDL_EVENT_GAMEPAD_ADDED) {
+        ++events.gamepad_added;
+        g64_uwp_queue_gamepad_event(event->gdevice.which, receive_gamepad);
+    }
     if (event->type == SDL_EVENT_JOYSTICK_REMOVED) ++events.joystick_removed;
     return true;
 }
@@ -27,6 +41,7 @@ int main() {
     CHECK(id != 0);
     SDL_PumpEvents();
     CHECK(events.joystick_added > 0 && events.gamepad_added > 0);
+    CHECK(bridged_id == id && bridged_connected && bridge_errors == 0);
     CHECK(SDL_IsGamepad(id));
     auto* gamepad = SDL_OpenGamepad(id);
     CHECK(gamepad != nullptr);
