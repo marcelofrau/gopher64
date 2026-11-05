@@ -67,6 +67,9 @@ flowchart LR
 | 15 | [Local build/debug workflow](15-local-build-debug-workflow-plan.md) | P1 scripts, build evidence, and P2 VS/Xbox work still pending |
 | 16 | [P2 host/frontend plan](16-p2-host-frontend-plan.md) | Integration evidence, C++/ImGui direction, open risks and staged checks |
 | 17 | [P2 implementation handoff](17-p2-implementation-handoff.md) | PC build/runtime evidence, scripts, diagnosed failures and unverified Xbox work |
+| 18 | [Dozen P3 work plan](18-dozen-p3-work-plan.md) | Active P3 Vulkan/Dozen integration plan, baselines and incremental checks |
+| 19 | [Rendering bring-up on Xbox](19-rendering-bringup-xbox.md) | First-frame failure modes, log reading guide, console test order |
+| 20 | [GUI design vision](20-gui-design-vision.md) | Visual identity, menu scope and asset strategy for the P5 gamepad shell |
 
 ---
 
