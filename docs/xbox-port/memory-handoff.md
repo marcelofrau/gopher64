@@ -761,3 +761,23 @@ link/packaging errors before the console. Findings:
 - **Pending:** user reruns Release/x64 using the same experimental solution, listens for pitch and
   stutters, and shares several `audio: input=` lines after startup. No real playback was run by the
   agent; output DLLs and renderer are unchanged, and DXIL 1.9 remains experimental on Xbox.
+
+## 2026-11-05 - YODA: user confirms PC audio; sharing state
+
+- The user reports that the audio issue is resolved in the PC Release test after the resampling fix.
+  No new diagnostic counters or audio recording were supplied; this is a subjective user result for
+  the tested SM64 run, not proof for all games, audio-rate transitions or Xbox.
+- The working PC experiment combines Dozen 25.3.3 SHA-256
+  `972C65469440AF3C7834A84CD2B55C87457E7DAA2E1BC660AC26180C01C2D272` with Microsoft SDK DXIL
+  1.9.2602.17 SHA-256 `DB108FFEF7BCECB984BDCCF2B4725719D65B2CE7F1EBC40019DBE6C5A7016E09`.
+  The DXIL file was locally installed and Microsoft-signed; no binaries or generated build trees
+  are committed. The SDK file's redistribution rights and Xbox compatibility remain unverified.
+- **Cross-machine build caveat:** the experimental VS solution and paired DLL directory exist only
+  in YODA's build output. Default scripts can select the RetroArch pair with the older crashing DXIL;
+  a Git pull alone does not recreate the working experiment. For a PC-only reconstruction, obtain
+  the two inputs separately, verify the hashes above, set `GOPHER64_DOZEN_DIR` to their local
+  directory and run `scripts/uwp/open-vs.ps1 -Configuration Release` (use `-SkipDependencies` only
+  after dependencies are built). This generates a new solution; its runtime has not been reverified.
+- The user authorized committing and pushing this work and indicated there is another issue to
+  resolve before Xbox testing; its details have not yet been provided. No automated Xbox access or
+  deployment is authorized.

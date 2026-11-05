@@ -4,10 +4,11 @@
 been exercised on a Windows PC. No Xbox installation, tile launch, F5 session, `rdp_init`, or game
 rendering has been verified. This is a development package, not a release.
 
-> This file records the earlier P2 baseline. The later experimental P3 Dozen integration reaches
-> `rdp_init` on a PC, then hangs opening the SDL audio stream; see the current
-> [work journal](memory-handoff.md) and [P3 plan](18-dozen-p3-work-plan.md). No game frame or Xbox
-> execution has been verified.
+> This file records the earlier P2 baseline. On 2026-11-05 the user tested an experimental P3
+> UWP build on YODA: SM64 displayed correctly in observed screens, ran at 30 FPS / 60 VI/s in
+> Release, and audio was reported fixed after the XAudio2 resampling change. This used a local,
+> experimental DXIL 1.9 DLL, not the default DLL; see the [work journal](memory-handoff.md).
+> Xbox execution remains unverified.
 
 ## What exists
 

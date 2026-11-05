@@ -3,10 +3,14 @@
 Status: implementation in progress; P3 is not complete. The user authorized this work on
 2026-11-04. All agent-run deployment and runtime tests are PC-only; the user alone operates Xbox.
 
-**End-of-day checkpoint:** steps 1–3 reached ICD/device and CoreWindow surface on the PC; step 4
-reached `rdp_init` successfully but then hung in `SDL_OpenAudioDeviceStream`, before any game
-frame. The precise root cause, visual output, audio, Xbox and release certification remain unproven.
-See the [work journal](memory-handoff.md) for experiments and the next diagnostic.
+**2026-11-04 checkpoint:** steps 1–3 reached ICD/device and CoreWindow surface on PC; step 4
+reached `rdp_init` but hung in `SDL_OpenAudioDeviceStream` before any game frame.
+
+**2026-11-05 update:** on YODA, the user observed correct SM64 screens and 30 FPS / 60 VI/s in an
+experimental UWP Release build, then reported audio fixed in a later run. This uses a local DXIL 1.9
+DLL and the ubershader; it is
+not a validated standard package or Xbox result. See the [work journal](memory-handoff.md) for
+the failed attempts, exact component hashes, and remaining diagnostics and validation.
 
 ## Baselines and constraints
 
