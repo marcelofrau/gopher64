@@ -635,3 +635,33 @@ link/packaging errors before the console. Findings:
 - Pending: the user must close the old solution and open the new `-direct` solution using the physical
   H: path, then F5 on PC. Only a successful registration can confirm the workaround; runtime ROM,
   audio and Xbox results remain pending.
+
+### PC F5 reaches first scanout and DXIL exception — 2026-11-05 — YODA
+
+- The user ran the new physical-path solution on PC: AppX registration and launch succeeded, so
+  the preceding untrusted-junction failure is resolved for this path. The current XAudio2 and
+  timestamped `[rdp]` logging were present; Mario 64 was selected and staged successfully.
+- Evidence in order: D3D11 status frame presented; frontend exited; Dozen 25.3.3 detected RTX 4070
+  SUPER; surface/swapchain and RDP initialization succeeded; audio and input initialized; emulated
+  CPU loop entered. Compute-shader stall warnings reported `success: yes`. Then the VS debugger
+  reported `0xC0000005` reading memory inside `dxil.dll`, called via `vulkan_dzn.dll`, from
+  `vkCreateGraphicsPipelines` during `RDP::VideoInterface::aa_fetch_stage` / `scanout` / `render_frame`.
+  The selected graphics program is `fullscreen.vert` plus `vi_fetch.frag` (the embedded fetch-bug
+  variant is not yet known). This stack establishes where the exception surfaced, not which shader
+  stage or component caused the invalid access. The pasted output says `Exception thrown`, not
+  `unhandled`; whether continuing in the debugger recovers or terminates is pending user feedback.
+  No successful game frame or audible game output was reported.
+- The packaged validator reports file version `101.7.2308.24` and SHA-256 prefix `0DAF173C`; the
+  paired ICD reports Mesa 25.3.3. A newer Microsoft-signed SDK validator is present locally
+  (`1.9.2602.17`), but UWP compatibility and effect on this failure have **not** been tested; no DLL
+  was swapped. The local Mesa source tree is not proven to match the supplied 25.3.3 binary, so its
+  validation code is informative only, not a symbol-level identification of the fault.
+- Reference: P0's four-game desktop success used Dozen 26.2.4, ubershader enabled and NVIDIA RTX 3500
+  Ada (`14-p0-handoff.md`); a different desktop 26.2.6 failed. This UWP run reports neither an
+  ubershader override nor a successful image. The renderer defaults ubershader off and the normal
+  renderer source reads the CRT environment; differences from P0 are hypotheses, not a proven cause
+  of this scanout graphics-pipeline exception. Do not silently disable VI filtering or abandon Dozen.
+- Next diagnostic: if VS is paused on the exception, the user can continue once and report whether it
+  is handled, repeats, or terminates. Only then choose a controlled PC A/B (one variable at a time,
+  starting from the same ROM and renderer); explain the expected outcome before running it. No Xbox
+  test and no runtime-code change were performed by the agent.
