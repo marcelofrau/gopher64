@@ -502,3 +502,23 @@ Opus agent, PC only. Prep so the console agent can attack first-frame rendering 
   Do NOT build the shell's game hand-over before Q-06 is validated on console.
 - Verified on PC: UWP staticlib + desktop cargo check and fmt green. Config symbols compile; no
   Xbox test. No logic in the emulator core changed.
+
+### Host build validation attempt from the Opus/PC machine — 2026-11-05
+
+Tried to run the UWP host build (`scripts/uwp/build-host.ps1` path) on the Opus machine to catch
+link/packaging errors before the console. Findings:
+
+- **The WindowsStore v180 C++ toolset IS present** here (VS 18 BuildTools, `VC.Tools.x86.x64`):
+  `cmake -G "Visual Studio 18 2026" -A x64 -DCMAKE_SYSTEM_NAME=WindowsStore` reaches MSBuild and
+  processes the generated `.vcxproj`. So the host's toolchain gating is not the blocker here. (The
+  dedicated `UWP.VC.v143` component query returns empty, but the v180 WindowsStore toolset covers it.)
+- **The host CMake configure fails at the ImGui `FetchContent`** (`uwp/CMakeLists.txt:17-23`): it
+  downloads ImGui from a github.com tarball URL, and that download fails on this machine
+  (`download-imgui-populate.cmake:163 … downloading '…imgui…tar.gz' failed`). This is an environment
+  network limitation on the Opus machine, not a code defect — the CMakeLists is syntactically fine up
+  to that point. For a reliable/offline build, the console machine should ensure ImGui is cached or
+  vendored (e.g. pre-populate `FetchContent` cache, or vendor the pinned ImGui under `uwp/extern/`),
+  otherwise `build-host.ps1` needs working outbound network at configure time.
+- Net: the Opus machine cannot complete the host MSIX build (ImGui fetch + final appx packaging are
+  the gaps), so host build/package/F5 stays with the console machine. No code change resulted; this
+  is a recorded environment finding. Probe build dirs (`out/uwp-host-probe*`) were deleted.
