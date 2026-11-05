@@ -22,6 +22,14 @@ FetchContent_Declare(imgui
 )
 FetchContent_MakeAvailable(imgui)
 
+add_custom_target(gopher64-rust
+    COMMAND pwsh -NoProfile -File "${GOPHER64_ROOT}/scripts/uwp/build.ps1"
+        -Configuration $<CONFIG> -SkipDependencies
+    WORKING_DIRECTORY "${GOPHER64_ROOT}"
+    VERBATIM
+)
+set_target_properties(gopher64-rust PROPERTIES VS_GLOBAL_DisableFastUpToDateCheck true)
+
 add_executable(gopher64-uwp WIN32
     host/main.cpp
     host/dozen_probe.cpp
@@ -33,6 +41,8 @@ add_executable(gopher64-uwp WIN32
     "${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/Package.appxmanifest"
 )
+add_dependencies(gopher64-uwp gopher64-rust)
+set_target_properties(gopher64-uwp PROPERTIES VS_GLOBAL_DisableFastUpToDateCheck true)
 set_source_files_properties(host/main.cpp PROPERTIES COMPILE_OPTIONS /ZW)
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT gopher64-uwp)
 set_target_properties(gopher64-uwp PROPERTIES

@@ -45,7 +45,12 @@ Write-Host "Development package version: $PackageVersion"
 & cmake -S (Join-Path $root 'uwp') -B $build -G $vs.Generator -A x64 `
     '-DCMAKE_SYSTEM_NAME=WindowsStore' '-DCMAKE_SYSTEM_VERSION=10.0' "-DGOPHER64_PACKAGE_VERSION=$PackageVersion" "-DGOPHER64_DOZEN_DIR=$DozenDir"
 if ($LASTEXITCODE) { throw "UWP host configuration failed ($LASTEXITCODE)." }
-& cmake --build $build --config $Configuration --target gopher64-uwp --parallel
+if ($SkipRust) {
+    # shortcut: skips all VS project references; revisit if the host gains non-Rust build dependencies.
+    & cmake --build $build --config $Configuration --target gopher64-uwp --parallel -- /p:BuildProjectReferences=false
+} else {
+    & cmake --build $build --config $Configuration --target gopher64-uwp --parallel
+}
 if ($LASTEXITCODE) { throw "UWP host build failed ($LASTEXITCODE)." }
 $suffix = if ($Configuration -eq 'Debug') { '_x64_Debug' } else { '_x64' }
 $packageBase = "gopher64-uwp_${PackageVersion}${suffix}"

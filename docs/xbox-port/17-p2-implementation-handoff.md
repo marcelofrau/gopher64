@@ -101,12 +101,24 @@ missing-ROM error from Rust. This is not a new VS F5 or Xbox test; those remain 
 Run from the repository root in PowerShell 7. These use the already documented SDL3-uwp and SDL_ttf
 workspaces and Rust prerequisites from [15](15-local-build-debug-workflow-plan.md).
 
+The generated Visual Studio project builds the matching Rust static library before linking the host.
+Cargo checks for changes incrementally on each build. Under **Tools → Options → Projects and Solutions
+→ Build and Run**, set **On Run, when projects are out of date** to **Always build**, and **On Run,
+when build or deployment errors occur** to **Do not launch**. Otherwise VS can run an old binary.
+Regenerate older solutions with `open-vs.ps1` before relying on this. A command-line build makes the
+MSIX but does not deploy it or necessarily refresh the local `Debug/AppX` layout; VS F5 deploys it.
+`-SkipDependencies` reuses existing SDL dependencies. The explicit `build-host.ps1 -SkipRust`
+option bypasses Rust and can use a stale library; never use it after changing core sources.
+
 ```powershell
 # Full Release build, including SDL and Rust; prints the exact MSIX path.
 pwsh -NoProfile -File scripts/uwp/build-host.ps1 -InitSubmodules
 
 # Build Debug and open the generated solution in the detected Visual Studio.
 pwsh -NoProfile -File scripts/uwp/open-vs.ps1 -Configuration Debug
+
+# Optional: regenerate and open Debug using already built SDL dependencies.
+pwsh -NoProfile -File scripts/uwp/open-vs.ps1 -Configuration Debug -SkipDependencies
 
 # Replace <msix> with the exact path printed by build-host; no certificate is installed by this script.
 pwsh -NoProfile -File scripts/uwp/install-pc.ps1 -Package '<msix>'

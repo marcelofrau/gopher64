@@ -21,9 +21,12 @@ if it cannot be determined, say **unknown**. A separate `.env` is unnecessary fo
 Tool availability and test results are dated observations, not guarantees; recheck when needed.
 Agent/model names are not machine names and do not determine their abilities or access.
 
-- **YODA:** current host identified by `COMPUTERNAME` on 2026-11-05. The user identifies this as
-  the VS 2026 and Xbox-access environment; those capabilities were not re-tested in this update.
-  Only the user may deploy to or launch the Xbox, including VS F5.
+- **YODA:** current host identified by `COMPUTERNAME` on 2026-11-05. VS 2026 host builds were
+  verified here; the user identifies it as the Xbox-access environment. Only the user may deploy
+  to or launch the Xbox, including VS F5.
+- **YODA storage, 2026-11-05:** repository `out` and `target` are junctions to H:. Full pre-switch
+  originals remain in the `gopher64-build-backup-20261105` directory on F:. Do not delete them
+  without user approval; they still occupy F: space. H: must be available to build.
 - **Other host, name unknown:** the 2026-11-05 Opus entries below were written on another PC. Its
   reported Rust/clang tests and host-build investigation apply to that PC only. The later probe
   found VS 18 Build Tools and a WindowsStore v180 toolset, but its ImGui download failed and a
@@ -542,3 +545,68 @@ link/packaging errors before the console. Findings:
   check, game or console test was run; this was a documentation-only update. An existing untracked
   `out/` directory was left untouched. Recheck machine capabilities before relying on them and
   record the other host's actual name when observed there.
+
+### User PC F5 Mario 64 hang and stale Rust artifact — 2026-11-05 — YODA
+
+- The user selected Mario 64 on PC through VS 2026 F5 and reported a blank/stuck game window.
+  The supplied VS Output shows timestamped host/Rust logs, so that debugger output route works in
+  this run. The picker staged the ROM, the SDL frontend exited, Dozen initialized a 640x480
+  swapchain, `rdp_init` succeeded, and the final application marker was `audio: SDL audio
+  subsystem initialized; opening stream`. There is no subsequent application marker in the paste;
+  this identifies the last observed stage, not proof of the precise blocking call or its cause.
+  Gaming Input and Game Bar HRESULT diagnostics appear too, but do not establish this hang's cause.
+- The shipped Debug EXE was built on Nov 5, while the Debug Rust staticlib it links was dated
+  Nov 4. A byte scan of the actual AppX EXE found the old `audio: SDL audio subsystem initialized;
+  opening stream` marker; it did not find the new `[rdp] ` or `XAudio2Create` strings. Current
+  sources instead use the UWP XAudio2 shim and do not contain the old audio marker. The observed
+  F5 run therefore exercised a stale Rust core, not the latest Opus audio/logging changes. VS's
+  generated host project links the prebuilt staticlib; a VS-only build/F5 does not rebuild it.
+- Added the required pre-F5 rebuild procedure to the P2 workflow. Stop debugging and run
+  `pwsh -NoProfile -File scripts/uwp/open-vs.ps1 -Configuration Debug -SkipDependencies` from the
+  repo root, then use the opened solution for the user's next PC F5 test. `-SkipDependencies`
+  reuses installed SDL dependencies but does not skip Rust. If the build fails, retain and inspect
+  its complete output before retrying. Do not uninstall the existing app or delete its LocalState.
+- Verification here was read-only inspection of sources, scripts, artifact timestamps and the
+  packaged EXE's byte strings; no rebuild, new F5, ROM execution or Xbox test was performed by
+  the agent. The updated XAudio2 runtime, complete SDL/Granite log routing and first game frame
+  remain unverified. Note: in the current code the XAudio2 shim has no detailed open-stage logs and
+  a failed open panics with a generic message, so more targeted instrumentation may still be needed
+  if a fresh build stalls or fails there. Preserve the user's untracked `out/` contents.
+
+### VS builds Rust and YODA build storage moved to H: — 2026-11-05 — YODA
+
+- User requested F5 builds the latest Rust automatically and approved junctions on H: to avoid F:
+  running out of space. No agent launch or deployment to Xbox or PC was performed.
+- Added a CMake VS project dependency that runs the UWP Rust build with `-SkipDependencies` before
+  linking the host; Cargo handles incremental builds. Unsupported configurations fail the build.
+  Explicit `build-host.ps1 -SkipRust` remains available by disabling project references for that
+  already-configured command-line build; do not use it to test changed Rust. On VS itself, set
+  **Always build** on Run and **Do not launch** on build/deployment errors (see the P2 handoff).
+  These IDE settings are user-controlled and have not yet been verified here.
+- The first isolated Debug build correctly blocked the host on a Rust failure: F: had only ~0.38 GiB
+  free and staticlib creation failed with `No space left on device`. After user approval and closing
+  VS, copied both `out` and `target` to H: and switched the original paths to junctions. No elevation
+  was needed. Copies were compared by file size/timestamp; the two Rust libraries, VS AppX EXE and
+  CMake cache also matched SHA-256. One copied incremental metadata file had a different timestamp
+  but the same SHA-256; corrected its copied timestamp before comparison. Some VS index files
+  disappeared from the source as VS closed during the first copy; their extra copies were preserved
+  separately on H: under `gopher64-copy-extras` rather than deleted.
+- The complete originals remain in `gopher64-build-backup-20261105` on F: and have not been
+  deleted. F: reported about 10.66 GiB free after the work, up from ~0.38 GiB at the failure; the
+  reason for that change was not established. The backups still occupy F: space; ask the user before
+  removing them. H: is now required for builds.
+- Validation on PC: Debug and Release Rust/host/MSIX builds passed in a separate build directory;
+  an unsupported `RelWithDebInfo` build failed before the host; a repeated Debug build reran Cargo
+  incrementally. Touching a Rust source timestamp rebuilt `gopher64.lib` and relinked the Debug host.
+  The normal Debug `build-host.ps1 -SkipDependencies` succeeded with import audit, as did explicit
+  `-SkipRust` without invoking Rust. The normal MSIX EXE SHA-256 matched the linked EXE and contains
+  XAudio2 and `[rdp]` markers, not the old SDL audio-opening string. Builds emitted existing C/C++
+  warnings, `LNK4075` and `APPX0006`; the import audit still warns Store/API and Xbox validation are
+  outstanding. The new generated-project integration checks and existing import-audit checks passed;
+  `git diff --check` passed. Build test logs are on H: under `gopher64-*-verification.log`.
+- The command-line build did not deploy or refresh the existing `Debug/AppX` EXE. This is not proof
+  that F5 deploy fails; layout refresh and the new runtime behavior remain for the user's manual PC
+  F5 test. Reopen the regenerated `out/uwp-host-vs2026/Gopher64UWP.slnx`, check the two IDE settings,
+  and capture the new VS Output through the last line after loading Mario 64. Do not infer the old
+  hang is fixed until that test. The prior advice to rerun `open-vs.ps1` before every F5 is superseded
+  by the project dependency; regeneration remains needed after generator/build-configuration changes.
