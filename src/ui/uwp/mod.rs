@@ -1,4 +1,5 @@
 // UWP-PORT: port-owned helpers used only on the UWP (Xbox) target. (D-14)
+pub mod audio;
 pub mod entry;
 pub mod time;
 

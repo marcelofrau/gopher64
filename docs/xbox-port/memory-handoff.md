@@ -344,3 +344,36 @@ and authorized continuing with Dozen integration. Direct/brokered ROM access rem
   `-Dwarnings`; formatting, PowerShell parse and the Dozen/audit script self-checks passed. Existing
   native C/C++ deprecated-API and signedness warnings, Debug `LNK4075`, and `APPX0006` remain. No
   latest P3 Release UWP build, desktop gameplay/save test, visual game frame, or Xbox test was run.
+
+### P3 audio deadlock resolved with XAudio2 backend — 2026-11-05
+
+- Diagnosed the reproducible PC hang in `SDL_OpenAudioDeviceStream` (logged `opening stream`,
+  never returned). Root cause is the one Ymir already hit: SDL3 WinRT WASAPI calls
+  `ActivateAudioInterfaceAsync` and waits on a semaphore with no timeout; the CoreWindow
+  dispatcher never services the completion from the UI thread. Not fixable in SDL (submodule).
+- Implemented decision D-08 (XAudio2 backend). New port-owned files:
+  `uwp/audio/g64_xaudio2.{h,cpp}` (synchronous XAudio2: engine → mastering voice → source voice,
+  4×512-frame recycled buffers fed from a lock-guarded ring buffer by `IXAudio2VoiceCallback`,
+  with linear resampling driven by the frequency ratio so the existing drift control keeps
+  working; never blocks the emulator). Architecture adapted from Ymir commit `071639c9`, but to
+  gopher64's push model instead of Ymir's pull model. Rust shim `src/ui/uwp/audio.rs` mirrors the
+  `sdl3_sys::audio` names/signatures.
+- Upstream hook is minimal and gated: `src/ui/audio.rs` gets a single `use … as aud` alias at the
+  top (SDL on desktop/Android, the shim on UWP) and a uniform `aud::` prefix on the call sites —
+  no per-call-site `cfg`. `src/ui.rs` gates the `Audio.audio_stream` field type. `build.rs`
+  compiles the backend, links `xaudio2`, and bindgens its header inside the existing `uwp` block.
+  Removed the 5 earlier UWP-only diagnostic log lines in `audio.rs` now that the hang is gone.
+- Compiled on a Windows PC by Claude (Opus): the UWP staticlib links and exports `g64_audio_*`;
+  desktop `cargo fmt --check`, both Clippy profiles (`-Dwarnings`), and `cargo test --lib`
+  (9 passed) are green. **Not tested on Xbox hardware** — the deadlock is avoided because the SDL
+  audio path is no longer called on UWP, but real playback, drift control and underrun behavior
+  need console validation (P4). `fidelity-reviewer` PASS for this increment (3 upstream files,
+  ~96 lines), after fixing two process gaps: the code referenced a nonexistent D-19 (corrected to
+  the existing D-08) and the hook inventory / D-08 status note were updated.
+- Also produced (not acted on yet, per user) a fidelity report on the earlier P2/P3 commits
+  (2953b68..ad49f2b): the cumulative upstream diff is ~713 lines (over the 400 budget) with
+  non-gated behavior changes in `device.rs` (run_game→Result, swap_rom, get_rom_contents),
+  `rdram.rs` (AlignedRdram, savestate format preserved with a byte-exact test), `config.rs`
+  (write_json refactor), and a submodule source file swapped via `uwp/compat/rdp_device_uwp.cpp`.
+  Some fix real bugs and are upstream-PR candidates. These are already flagged in the doc's
+  "Fidelity deviations requiring ongoing review" section; a dedicated cleanup pass is deferred.

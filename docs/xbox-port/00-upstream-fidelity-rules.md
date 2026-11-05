@@ -144,7 +144,9 @@ Status: ✔ landed (P1 blocks 1–6) · ○ planned (P1 block 8 / P2+).
 | `build.rs` | UWP compiler/compatibility setup and port-owned RDP environment wrapper; no submodule edits | D-14, D-07 | growing | ✔ |
 | `src/lib.rs` | `cfg` swap of `mod netplay` to the stub via `#[path]` (block 8 will add the UWP entry module) | D-09, D-02 | ~7 | ✔ |
 | `src/ui.rs` | `mod uwp` line; `get_dirs()` UWP delegation; `WEB_CLIENT` cfg widened | D-10, D-11, D-04 | ~10 | ✔ |
-| `src/ui/audio.rs` | UWP-only diagnostics around SDL audio initialization; stream open currently hangs on PC. Backend choice is not decided; see [18](18-dozen-p3-work-plan.md) | D-08 | small | ✔ (diagnostic) |
+| `src/ui/audio.rs` | Gated `use … as aud` alias at the top selecting the XAudio2 shim (`src/ui/uwp/audio.rs`) on UWP vs `sdl3_sys::audio` elsewhere; call sites are a uniform `aud::` prefix. Fixes the SDL WinRT `SDL_OpenAudioDeviceStream` deadlock. | D-08 | ~32 | ✔ |
+| `src/ui.rs` (Audio.audio_stream) | gated field type: SDL stream vs XAudio2 shim handle | D-08 | ~4 | ✔ |
+| `build.rs` (xaudio2) | compile `uwp/audio/g64_xaudio2.cpp`, link `xaudio2`, bindgen its header (inside the `uwp` block) | D-08 | ~25 | ✔ |
 | `src/ui/video.rs` | UWP error handling/diagnostics and plain SDL window for Mesa CoreWindow WSI | D-14, D-09, D-07 | growing | ✔ (experimental) |
 | `src/device/vi.rs` | `cfg`-gated call to `ui::uwp::time::precise_sleep` next to the untouched `spin_sleep::sleep` | 05 §4 | ~5 | ✔ |
 | `src/main.rs` | none (desktop only) | — | 0 | — |

@@ -154,6 +154,31 @@ fn main() {
             b.define("_XBOX_UWP", None);
             b.flag("/FIuwp/compat/g64_uwp_compat.h");
         }
+
+        // UWP-PORT: XAudio2 backend replacing SDL's deadlocking WASAPI path. (D-08)
+        cc::Build::new()
+            .cpp(true)
+            .std("c++20")
+            .flag(opt_flag)
+            .define("GOPHER64_UWP", None)
+            .define("WINAPI_FAMILY", "WINAPI_FAMILY_APP")
+            .define("_XBOX_UWP", None)
+            .file("uwp/audio/g64_xaudio2.cpp")
+            .compile("g64_xaudio2");
+        println!("cargo:rustc-link-lib=xaudio2");
+
+        let audio_bindings = bindgen::Builder::default()
+            .header("uwp/audio/g64_xaudio2.h")
+            .allowlist_function("g64_audio_.*")
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+            .generate()
+            .expect("Unable to generate g64_xaudio2 bindings");
+        audio_bindings
+            .write_to_file(
+                std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap())
+                    .join("g64_xaudio2_bindings.rs"),
+            )
+            .expect("Couldn't write g64_xaudio2 bindings!");
     }
 
     if os == "windows" {

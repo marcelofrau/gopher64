@@ -67,7 +67,11 @@ pub struct Dirs {
 
 #[derive(Default)]
 pub struct Audio {
+    // UWP-PORT: on UWP the stream is the XAudio2 shim handle, not SDL's (D-08).
+    #[cfg(not(target_vendor = "uwp"))]
     pub audio_stream: *mut sdl3_sys::audio::SDL_AudioStream,
+    #[cfg(target_vendor = "uwp")]
+    pub audio_stream: *mut crate::ui::uwp::audio::SDL_AudioStream,
     pub gain: f32,
 }
 
