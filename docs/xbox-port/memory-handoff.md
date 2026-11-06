@@ -1114,3 +1114,15 @@ link/packaging errors before the console. Findings:
   descriptor layout and non-upscaled specialization; pipeline creation succeeded. This does not
   reproduce the Xbox driver or the full emulator state and does not prove execution correctness.
   No changes to the app, deployed DLLs, or console were made during this investigation.
+- After the user stopped debugging, built a diagnostic-only variation of the candidate. It logs
+  failures for SPIR-V-to-NIR, NIR-to-DXIL, DXIL validation (including its message), and D3D12
+  CreatePipelineState (including HRESULT) with the prefix `G64-DZN-DIAG`. Windows Mesa logging
+  defaults to OutputDebugString, but emission of these failure messages on Xbox remains untested.
+- The diagnostic candidate passed the PC narrow-storage smoke test; the Release package and
+  module audit passed with 484 warnings and zero errors. The packaged Dozen SHA-256 is
+  `820615746E8D53D0BB0F83BE680272EEC4CFE1AA2A5307D98A7206BFD4B5F93F`; DXIL is unchanged.
+  The previously Xbox-tested candidate is preserved as `out/uwp-dozen/vulkan_dzn.before-stage-diagnostic.bak`;
+  the original driver backup is also untouched. No Xbox deployment was performed by the agent.
+- Next: the user deploys the root solution in Release and provides the complete Output around
+  the failure, including `G64-DZN-DIAG` and `VALIDATION ERROR` if present. This build is diagnostic,
+  not a fix. Continue to treat game rendering, controller buttons, audio and saves as unverified.
