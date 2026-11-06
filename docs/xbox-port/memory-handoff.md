@@ -954,3 +954,7 @@ link/packaging errors before the console. Findings:
 - Fetched `origin`; it remained exactly four commits behind local before publication. The remaining
   four local commits contain the tracked root solution, VS native host project, physical-directory
   deployment recipe and supporting docs/scripts. After validation, publish them together.
+- After that push, the user explicitly authorized tracking the previously untracked GUI assets under
+  `docs/assets/exported/` and `docs/assets/fonts/`; they were prepared in parallel for the future GUI.
+  Inventory: 14 PNG assets (including eight navigation icons), two TTF fonts and one OTF font. Commit
+  and push those assets separately; no asset contents were edited.
