@@ -142,6 +142,8 @@ Status: ✔ landed (P1 blocks 1–6) · ○ planned (P1 block 8 / P2+).
 | `Cargo.toml` | Target-specific dependency tables (+ `rustls`/`ring` and `sdl3-sys`/`assert-level-release` in the UWP table only) | D-05, D-09, D-11, D-15 | ~39 | ✔ |
 | `.cargo/config.toml` | `[target.x86_64-uwp-windows-msvc]` section + target CC vars (appended at end) | D-05, D-14 | ~10 | ✔ |
 | `build.rs` | UWP compiler/compatibility setup and port-owned RDP environment wrapper; no submodule edits | D-14, D-07 | growing | ✔ |
+| `.gitignore` | UWP generated output, local links and VS solution directories | D-02 | ~4 | ✔ |
+| `Gopher64UWP.slnx` (new port entry point) | Relative reference to the port-owned native VS project | D-02 | ~10 | ✔ |
 | `src/lib.rs` | `cfg` swap of `mod netplay` to the stub via `#[path]` (block 8 will add the UWP entry module) | D-09, D-02 | ~7 | ✔ |
 | `src/ui.rs` | `mod uwp`; `get_dirs()` delegation; `WEB_CLIENT` cfg; UWP SDL input hints | D-10, D-11, D-04 | growing | ✔ |
 | `src/ui/input.rs` | UWP-only gamepad init, hotplug and diagnostic delegates into the port | D-04 | growing | ✔ (PC controller untested) |

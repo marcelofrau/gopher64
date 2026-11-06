@@ -27,7 +27,7 @@ rendering has been verified. This is a development package, not a release.
   The host presents its status screen, tears down its SDL/ImGui resources, calls the existing Rust
   entry synchronously on that thread, and attempts to restore the status screen after return. It
   displays the Rust entry error there. Full game → menu lifecycle is not yet proven.
-- `build-host.ps1` generates a VS solution and MSIX, calls the Rust build unless `-SkipRust` is
+- `build-host.ps1` builds the tracked root VS solution and MSIX, calls the Rust build unless `-SkipRust` is
   requested, and runs an import-module audit against the **packaged** EXE and DLLs. The build uses a
   changing development package version so Windows can update the existing identity without uninstalling
   or deleting `LocalState`. `-PackageVersion` overrides it if a specific version is needed.
@@ -102,27 +102,28 @@ missing-ROM error from Rust. This is not a new VS F5 or Xbox test; those remain 
 Run from the repository root in PowerShell 7. These use the already documented SDL3-uwp and SDL_ttf
 workspaces and Rust prerequisites from [15](15-local-build-debug-workflow-plan.md).
 
-The generated Visual Studio project builds the matching Rust static library before linking the host.
+The tracked root `Gopher64UWP.slnx` and `uwp/gopher64-uwp.vcxproj` build the matching Rust static library before linking the host.
 Cargo checks for changes incrementally on each build. Under **Tools → Options → Projects and Solutions
 → Build and Run**, set **On Run, when projects are out of date** to **Always build**, and **On Run,
 when build or deployment errors occur** to **Do not launch**. Otherwise VS can run an old binary.
-Regenerate older solutions with `open-vs.ps1` before relying on this. A command-line build makes the
+Open the root solution, not an older generated experimental solution. A command-line build makes the
 MSIX but does not deploy it or necessarily refresh the local `Debug/AppX` layout; VS F5 deploys it.
 `-SkipDependencies` reuses existing SDL dependencies. The explicit `build-host.ps1 -SkipRust`
 option bypasses Rust and can use a stale library; never use it after changing core sources.
-If the repository's `out` directory is a junction or symlink, the scripts use its resolved target
-and generate a separate `uwp-host-vs<version>-direct` solution. Open that solution by the physical
-path printed by the script: AppX deployment can reject a layout reached through an untrusted
-junction. Existing generated solutions are preserved, but still use their original paths.
+The solution is versioned at the repository root and needs no generation. Runtime output under
+`out/uwp-host` uses its resolved physical path for AppX deployment, without a hard-coded drive.
+AppX registration can reject a layout reached through an untrusted junction. Existing generated
+experimental solutions are preserved but superseded. The current workflow and limitations
+are in [21](21-first-xbox-smoke-test.md).
 
 ```powershell
 # Full Release build, including SDL and Rust; prints the exact MSIX path.
 pwsh -NoProfile -File scripts/uwp/build-host.ps1 -InitSubmodules
 
-# Build Debug and open the generated solution in the detected Visual Studio.
+# Optional: build Debug and open the tracked solution in the detected Visual Studio.
 pwsh -NoProfile -File scripts/uwp/open-vs.ps1 -Configuration Debug
 
-# Optional: regenerate and open Debug using already built SDL dependencies.
+# Optional: build and open Debug using already built SDL dependencies.
 pwsh -NoProfile -File scripts/uwp/open-vs.ps1 -Configuration Debug -SkipDependencies
 
 # Replace <msix> with the exact path printed by build-host; no certificate is installed by this script.

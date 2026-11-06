@@ -11,69 +11,27 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'common.ps1')
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$root = Resolve-UwpPhysicalPath (Join-Path $PSScriptRoot '../..')
 $vs = Get-UwpVisualStudio
-$build = Get-UwpHostBuildDir $root $vs.Version
-$explicitDozen = $DozenDir
-$DozenDir = Get-UwpDozenDir $root $build $DozenDir
-if ($DozenDir) {
-    $preferred = Join-Path (Split-Path -Parent $build) 'uwp-dozen'
-    if (-not $explicitDozen -and $DozenDir -ne $preferred) {
-        Write-Warning 'Using the legacy Dozen pair; it may differ from the PC-tested pair.'
-    }
-    $DozenDir = (Resolve-Path -LiteralPath $DozenDir).Path
-    Write-Host "Dozen directory: $DozenDir"
-    foreach ($dll in @('vulkan_dzn.dll', 'dxil.dll')) {
-        $path = Join-Path $DozenDir $dll
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing Dozen input: $path" }
-        Write-Host "$dll SHA256: $((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash)"
-    }
-} else {
-    throw 'Dozen ICD not found. Set GOPHER64_DOZEN_DIR or pass -DozenDir with UWP vulkan_dzn.dll and dxil.dll.'
+$output = Get-UwpHostOutputDir $root $vs.Version
+$DozenDir = Get-UwpDozenDir $root $output $DozenDir
+if (-not $DozenDir) { throw 'Provide out/uwp-dozen/vulkan_dzn.dll and dxil.dll, or set GOPHER64_DOZEN_DIR.' }
+if ($InitSubmodules) {
+    & git -C $root submodule update --init --recursive
+    if ($LASTEXITCODE) { throw 'Submodule initialization failed.' }
 }
-if (-not $PackageVersion) {
-    $now = [DateTime]::UtcNow
-    $days = [int]($now.Date - [DateTime]::new(2020, 1, 1)).TotalDays
-    $PackageVersion = "0.$days.$($now.Hour * 60 + $now.Minute).$($now.Second * 1000 + $now.Millisecond)"
+if (-not $SkipDependencies) {
+    & (Join-Path $PSScriptRoot 'build-deps.ps1') -Configuration $Configuration
 }
-if ($PackageVersion -notmatch '^\d+\.\d+\.\d+\.\d+$' -or
-    @($PackageVersion.Split('.') | Where-Object { [long]$_ -gt 65535 }).Count) {
-    throw "Invalid four-part UWP package version: $PackageVersion"
-}
-
-if (-not $SkipRust) {
-    & (Join-Path $PSScriptRoot 'build.ps1') -Configuration $Configuration `
-        -SkipDependencies:$SkipDependencies -InitSubmodules:$InitSubmodules
-}
-Write-Host "Configuring UWP host: $($vs.Generator) ($($vs.Install))"
-Write-Host "Development package version: $PackageVersion"
-& cmake -S (Join-Path $root 'uwp') -B $build -G $vs.Generator -A x64 `
-    '-DCMAKE_SYSTEM_NAME=WindowsStore' '-DCMAKE_SYSTEM_VERSION=10.0' "-DGOPHER64_PACKAGE_VERSION=$PackageVersion" "-DGOPHER64_DOZEN_DIR=$DozenDir"
-if ($LASTEXITCODE) { throw "UWP host configuration failed ($LASTEXITCODE)." }
-if ($SkipRust) {
-    # shortcut: skips all VS project references; revisit if the host gains non-Rust build dependencies.
-    & cmake --build $build --config $Configuration --target gopher64-uwp --parallel -- /p:BuildProjectReferences=false
-} else {
-    & cmake --build $build --config $Configuration --target gopher64-uwp --parallel
-}
+$properties = @('/p:Platform=x64', "/p:Configuration=$Configuration", "/p:Gopher64SkipRust=$($SkipRust.IsPresent.ToString().ToLowerInvariant())",
+    "/p:Gopher64DozenDir=$([IO.Path]::GetFullPath($DozenDir))")
+if ($PackageVersion) { $properties += "/p:Gopher64PackageVersion=$PackageVersion" }
+& (Join-Path $vs.Install 'MSBuild/Current/Bin/MSBuild.exe') (Join-Path $root 'Gopher64UWP.slnx') /t:Build /m /nologo @properties
 if ($LASTEXITCODE) { throw "UWP host build failed ($LASTEXITCODE)." }
-$suffix = if ($Configuration -eq 'Debug') { '_x64_Debug' } else { '_x64' }
-$packageBase = "gopher64-uwp_${PackageVersion}${suffix}"
-$package = Join-Path $build "AppPackages/gopher64-uwp/${packageBase}_Test/$packageBase.msix"
-if (-not (Test-Path -LiteralPath $package)) { throw "Expected UWP package not found: $package" }
-& (Join-Path $PSScriptRoot 'audit-imports.ps1') -Package $package
-# A previous VS deployment can have newer Debug DLLs in AppX than the Release
-# dependency build; refresh only these generated files to prevent stale F5 payloads.
-$layout = Join-Path $build "$Configuration/AppX"
-if (Test-Path -LiteralPath $layout) {
-    foreach ($dll in @('SDL3.dll', 'SDL3_ttf.dll')) {
-        $source = Join-Path $root "out/uwp-deps/bin/$dll"
-        $destination = Join-Path $layout $dll
-        if (-not (Test-Path -LiteralPath $destination) -or
-            (Get-FileHash -LiteralPath $source).Hash -ne (Get-FileHash -LiteralPath $destination).Hash) {
-            Copy-Item -LiteralPath $source -Destination $destination -Force
-        }
-    }
-}
-Write-Host "Visual Studio solution: $(Join-Path $build 'Gopher64UWP.slnx')"
-Write-Host "Package: $package"
+$package = Get-ChildItem (Join-Path $output 'AppPackages/*_Test/*.msix') |
+    Where-Object { ($_.Name -like '*_Debug.msix') -eq ($Configuration -eq 'Debug') } |
+    Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+if (-not $package) { throw 'Build did not produce the expected UWP package.' }
+& (Join-Path $PSScriptRoot 'audit-imports.ps1') -Package $package.FullName
+Write-Host "Visual Studio solution: $(Join-Path $root 'Gopher64UWP.slnx')"
+Write-Host "Package: $($package.FullName)"

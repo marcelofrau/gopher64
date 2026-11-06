@@ -12,7 +12,7 @@ $dumpbin = Join-Path $toolset.FullName 'bin/Hostx64/x64/dumpbin.exe'
 if (-not (Test-Path -LiteralPath $dumpbin)) { throw "dumpbin not found: $dumpbin" }
 
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$audit = Join-Path $repo ("out/uwp-host-vs$($vs.Version)/audit/" + [guid]::NewGuid().ToString('N'))
+$audit = Join-Path $repo ("out/uwp-host/audit/" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $audit | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Package).Path)

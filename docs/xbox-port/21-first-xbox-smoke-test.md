@@ -12,32 +12,54 @@ actions for the user.
 
 ## One primary solution
 
-The generated `Gopher64UWP.slnx` printed by `build-host.ps1` is the primary solution. If `out` is a
-junction, open it from the physical build drive, not through the junction: AppX registration can
-reject the latter as an untrusted mount point. Do not copy the generated solution to the repo root;
-its project and package paths are generated together.
+Open the **tracked `Gopher64UWP.slnx` at the repository root**. It references the tracked
+`uwp/gopher64-uwp.vcxproj`; neither file needs generating or contains a machine-specific drive.
+On YODA the canonical path is `F:\workspace\gopher64\Gopher64UWP.slnx`.
 
-To rebuild and open the primary solution on a configured PC:
+A normal clone uses ordinary `out/` and `target/` directories. YODA's junctions to H: are optional
+local storage choices, not prerequisites. MSBuild calls the matching Rust build before compiling
+and linking the host. A failed Rust build stops the host; VS must be configured not to launch an
+older executable after a build or deployment error.
+
+For a fresh checkout, install the prerequisites from [15](15-local-build-debug-workflow-plan.md),
+initialize the submodules, run `scripts/uwp/build-deps.ps1`, and provide the Dozen/DXIL pair below.
+The host build fetches the same hash-pinned ImGui sources used by the earlier CMake host and
+prepares its local manifest and development certificate. The solution/project themselves are
+already present. Do not copy build caches to a new PC. Existing junctions copied with an entire
+working directory still need to point to valid local storage; scripts do not replace them.
+
+The host output is `out/uwp-host/`. Its physical deployment path is resolved for AppX;
+this keeps junctions usable without hard-coded drives or changes to Windows security. Junctions
+inside the configuration/AppX layout are rejected rather than silently traversed.
+
+On YODA, a temporary PC package with its own identity registered through the physical path but
+failed with `0x800701C0` through both the checkout's `out` junction and a new non-elevated junction.
+The temporary package was removed, and no security setting was changed. This is consistent with
+[Microsoft's redirection-trust policy](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-process-mitigation-redirection-trust-policy).
+The tracked project builds and generates the intended VS deployment recipe;
+its first VS F5 deployment still needs user verification.
+
+Double-click `Gopher64UWP.slnx`. Optionally, to rebuild and open it from a terminal:
 
 ```powershell
 pwsh -NoProfile -File scripts/uwp/open-vs.ps1 -SkipDependencies
 ```
 
-This builds Release by default and opens Visual Studio on the PC only. In Visual Studio explicitly
+The optional script builds Release by default and opens Visual Studio on the PC only. In Visual Studio explicitly
 select **Release | x64**, because its selected configuration is remembered independently. F5
 builds the matching Rust library before linking; configure VS to build out-of-date projects and not
 launch when build or deployment fails. The alternative A/B solutions are historical, not the
-primary workflow; do not delete them without the user's approval.
-The first F5 still needs to deploy the Release layout. An older Debug layout may contain the old
-DXIL and must not be used as evidence of what the Release package contains.
+primary workflow; do not delete them without the user's approval. This includes the former
+`.uwp-vs` solutions: the root solution supersedes them. No regeneration is needed for normal use.
+The first F5 still needs to deploy the Release layout. Older solutions and their layouts may contain
+the old DXIL and must not be used as evidence of what the new Release package contains.
 
 ## Dozen and DXIL inputs
 
-The host uses a local directory containing `vulkan_dzn.dll` and `dxil.dll`. Selection order is an
-explicit `-DozenDir` to `build-host.ps1` or `GOPHER64_DOZEN_DIR`, then a complete local `uwp-dozen`
-directory beside the generated host build, then the historical RetroArch source as a warned
-fallback. An incomplete local pair is reported and skipped. The build prints
-the selected directory and both SHA-256 hashes, and fails if a selected file is missing.
+Place `vulkan_dzn.dll` and `dxil.dll` in `out/uwp-dozen/`, or set `GOPHER64_DOZEN_DIR` before starting
+Visual Studio. Both files are required. The optional `build-host.ps1 -DozenDir ...` also supports
+an explicit one-build override and the historical warned RetroArch fallback. For consistent direct
+F5 builds, use the local pair or environment variable rather than relying on that fallback.
 
 The PC test used Dozen 25.3.3 and a Microsoft-signed SDK DXIL validator 1.9.2602.17:
 

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{D3A8A6BB-B92A-381C-9C64-D3A2CAEEB2B4}</ProjectGuid>
+    <ProjectName>gopher64-uwp</ProjectName>
+    <RootNamespace>Gopher64</RootNamespace>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <ApplicationType>Windows Store</ApplicationType>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <AppContainerApplication>true</AppContainerApplication>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+    <Gopher64Root>$(MSBuildThisFileDirectory)..\</Gopher64Root>
+    <Gopher64DozenDir Condition="'$(Gopher64DozenDir)' == ''">$(GOPHER64_DOZEN_DIR)</Gopher64DozenDir>
+    <Gopher64DozenDir Condition="'$(Gopher64DozenDir)' == ''">$(Gopher64Root)out\uwp-dozen</Gopher64DozenDir>
+    <Gopher64Imgui>$(Gopher64Root)out\uwp-deps\imgui\</Gopher64Imgui>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset Condition="'$(VisualStudioVersion)' == '17.0'">v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup>
+    <OutDir>$(Gopher64Root)out\uwp-host\$(Configuration)\</OutDir>
+    <IntDir>$(Gopher64Root)out\uwp-host\obj\$(Configuration)\</IntDir>
+    <AppxPackageDir>$(Gopher64Root)out\uwp-host\AppPackages\</AppxPackageDir>
+    <PackageCertificateKeyFile>$(Gopher64Root)out\uwp-host\Gopher64_TemporaryKey.pfx</PackageCertificateKeyFile>
+    <TargetName>gopher64-uwp</TargetName>
+    <LinkIncremental>false</LinkIncremental>
+    <RustProfile Condition="'$(Configuration)' == 'Debug'">debug</RustProfile>
+    <RustProfile Condition="'$(Configuration)' != 'Debug'">release</RustProfile>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(Gopher64Root)out\uwp-deps\include;$(Gopher64Imgui);$(Gopher64Imgui)backends;$(Gopher64Root)parallel-rdp\parallel-rdp-standalone\vulkan-headers\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <Optimization Condition="'$(Configuration)' == 'Debug'">Disabled</Optimization>
+      <Optimization Condition="'$(Configuration)' == 'Release'">MaxSpeed</Optimization>
+      <PreprocessorDefinitions Condition="'$(Configuration)' == 'Release'">NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(Gopher64Root)target\x86_64-uwp-windows-msvc\$(RustProfile)\deps\gopher64.lib;$(Gopher64Root)out\uwp-deps\lib\SDL3.lib;$(Gopher64Root)out\uwp-deps\lib\SDL3_ttf.lib;ntdll.lib;userenv.lib;ws2_32.lib;dbghelp.lib;windowsapp.lib;xaudio2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Windows</SubSystem>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="host\main.cpp"><CompileAsWinRT>true</CompileAsWinRT></ClCompile>
+    <ClCompile Include="host\dozen_probe.cpp" />
+    <ClCompile Include="$(Gopher64Imgui)imgui.cpp" />
+    <ClCompile Include="$(Gopher64Imgui)imgui_draw.cpp" />
+    <ClCompile Include="$(Gopher64Imgui)imgui_tables.cpp" />
+    <ClCompile Include="$(Gopher64Imgui)imgui_widgets.cpp" />
+    <ClCompile Include="$(Gopher64Imgui)backends\imgui_impl_sdl3.cpp" />
+    <ClCompile Include="$(Gopher64Imgui)backends\imgui_impl_sdlrenderer3.cpp" />
+    <AppxManifest Include="$(IntDir)Package.appxmanifest" />
+    <Image Include="Assets\*.png"><DeploymentContent>true</DeploymentContent></Image>
+    <None Include="$(Gopher64Root)out\uwp-deps\bin\SDL3.dll"><DeploymentContent>true</DeploymentContent></None>
+    <None Include="$(Gopher64Root)out\uwp-deps\bin\SDL3_ttf.dll"><DeploymentContent>true</DeploymentContent></None>
+    <None Include="$(Gopher64DozenDir)\vulkan_dzn.dll"><DeploymentContent>true</DeploymentContent></None>
+    <None Include="$(Gopher64DozenDir)\dxil.dll"><DeploymentContent>true</DeploymentContent></None>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="Gopher64PrepareHost" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(Platform)' != 'x64'" Text="The UWP host supports x64 only." />
+    <Exec Command="pwsh -NoProfile -File &quot;$(Gopher64Root)scripts\uwp\prepare-host.ps1&quot; -Configuration $(Configuration) -DozenDir &quot;$(Gopher64DozenDir)&quot; -PackageVersion &quot;$(Gopher64PackageVersion)&quot;" />
+    <!-- AppX registration cannot traverse an untrusted mount point; keep the project relative. -->
+    <ReadLinesFromFile File="$(IntDir)physical-output.txt">
+      <Output TaskParameter="Lines" PropertyName="Gopher64PhysicalOutput" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <OutDir>$(Gopher64PhysicalOutput)\</OutDir>
+      <TargetDir>$(OutDir)</TargetDir>
+      <TargetPath>$(OutDir)$(TargetName).exe</TargetPath>
+      <LayoutDir>$(OutDir)AppX</LayoutDir>
+      <FinalAppxManifestName>$(OutDir)AppxManifest.xml</FinalAppxManifestName>
+    </PropertyGroup>
+    <Exec Command="pwsh -NoProfile -File &quot;$(Gopher64Root)scripts\uwp\build.ps1&quot; -Configuration $(Configuration) -SkipDependencies" Condition="'$(Gopher64SkipRust)' != 'true'" />
+    <Error Condition="!Exists('$(Gopher64Root)target\x86_64-uwp-windows-msvc\$(RustProfile)\deps\gopher64.lib')" Text="The Rust static library is missing. Build without Gopher64SkipRust." />
+  </Target>
+  <Target Name="Gopher64LinkPaths" BeforeTargets="DoLinkOutputFilesMatch">
+    <ItemGroup>
+      <Link>
+        <OutputFile>$(TargetPath)</OutputFile>
+        <ProgramDatabaseFile>$(OutDir)$(TargetName).pdb</ProgramDatabaseFile>
+        <ImportLibrary>$(OutDir)$(TargetName).lib</ImportLibrary>
+      </Link>
+    </ItemGroup>
+  </Target>
+</Project>

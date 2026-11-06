@@ -2,7 +2,10 @@
 
 > **Status:** A PC UWP experiment reached game rendering, 30 FPS / 60 VI/s and user-confirmed audio. The final consolidated build and real gamepad are not yet tested; Xbox remains untested. See the [first Xbox smoke test](21-first-xbox-smoke-test.md) and [cross-machine work journal](memory-handoff.md).
 > **Plan date:** 2026-10-28
-> **Last local build verification:** 2026-11-05
+> **Last local build verification:** 2026-11-06
+>
+> **Visual Studio 2026:** open the tracked `Gopher64UWP.slnx` at the repository root.
+> No solution-generation step is required. See [21](21-first-xbox-smoke-test.md) for setup and manual Xbox testing.
 > **Upstream base:** `gopher64/gopher64@87385e7` (v1.1.42)
 > **Fork:** `marcelofrau/gopher64`
 > **Target:** Xbox Series X|S in Developer Mode, packaged as a UWP `.msix`.

@@ -13,5 +13,9 @@ target/
 # Added by cargo
 
 /target
+# UWP-PORT (D-02): generated build outputs, local links and VS solutions.
 /out/
+/.uwp-vs/
+/.vs/
+/uwp/*.vcxproj.user
 /.cargo/uwp-links.toml

@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
+# Legacy experimental generator; the supported VS entry point is ../Gopher64UWP.slnx.
 project(Gopher64UWP LANGUAGES CXX)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")

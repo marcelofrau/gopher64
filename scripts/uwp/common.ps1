@@ -23,14 +23,37 @@ function Test-UwpAllowedAdvapiImports([string[]]$Lines) {
     return $true
 }
 
-function Get-UwpHostBuildDir([string]$Root, [string]$Version) {
-    $out = Join-Path $Root 'out'
-    $item = Get-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue
-    if ($item -and $item.LinkType) {
-        # shortcut: resolves the out link only; resolve ancestor links too if encountered.
-        return Join-Path $item.ResolvedTarget "uwp-host-vs$Version-direct"
+function Resolve-UwpPhysicalPath([string]$Path, [int]$Depth = 0) {
+    if ($Depth -gt 32) { throw "Too many links while resolving $Path" }
+    if (-not [IO.Path]::IsPathRooted($Path)) { $Path = Join-Path (Get-Location).Path $Path }
+    $path = [IO.Path]::GetFullPath($Path)
+    $current = [IO.Path]::GetPathRoot($path)
+    foreach ($part in $path.Substring($current.Length).Split([IO.Path]::DirectorySeparatorChar, [StringSplitOptions]::RemoveEmptyEntries)) {
+        $next = Join-Path $current $part
+        $item = Get-Item -LiteralPath $next -Force -ErrorAction SilentlyContinue
+        if ($item -and $item.LinkType) {
+            $target = $item.Target
+            if (-not $target) { throw "Cannot resolve link: $next" }
+            if (-not [IO.Path]::IsPathRooted($target)) { $target = Join-Path (Split-Path -Parent $next) $target }
+            $current = Resolve-UwpPhysicalPath $target ($Depth + 1)
+        } else {
+            $current = $next
+        }
     }
-    return Join-Path $out "uwp-host-vs$Version"
+    return $current
+}
+
+function Get-UwpHostBuildDir([string]$Root, [string]$Version) {
+    return Resolve-UwpPhysicalPath $Root
+}
+
+function Get-UwpHostOutputDir([string]$Root, [string]$Version) {
+    $output = Resolve-UwpPhysicalPath (Join-Path $Root 'out/uwp-host')
+    foreach ($part in @('Debug', 'Release', 'Debug/AppX', 'Release/AppX')) {
+        $path = Join-Path $output $part
+        if ((Resolve-UwpPhysicalPath $path) -ne $path) { throw "AppX output subdirectory must not be a junction: $path" }
+    }
+    return $output
 }
 
 function Assert-UwpRuntimeFiles($Zip) {

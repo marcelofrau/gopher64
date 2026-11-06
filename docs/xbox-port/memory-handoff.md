@@ -852,3 +852,67 @@ link/packaging errors before the console. Findings:
   caused AppX error DEP0700 on the PC. The physical build path avoids that traversed junction.
 - No build or console access was performed. A separate checkout entry point could be considered
   if requested, while keeping generated package paths physical; it has not been implemented.
+
+## 2026-11-06 - YODA: portable generated solution attempt (superseded below)
+
+- The user questioned portability and requested a junction-compatible workflow.
+- Correction to the preceding entry: the observed failure was the path to the AppX layout/manifest,
+  not proof that opening the solution via a junction alone fails.
+- A PC-only synthetic package with its own identity registered through the physical path but failed
+  through the checkout's `out` junction and a new junction with `0x800701C0`.
+- The temporary test package was removed; its scratch files were retained in ignored `out`. No
+  production package was registered, no security settings were changed, and no console was accessed.
+- The primary solution is now generated under `.uwp-vs/vs2026-<checkout-key>` in the physical checkout; runtime
+  output and the AppX layout use the physical target of `out`. Paths are resolved per machine,
+  including ancestor junctions; the key also prevents reuse of generated caches after moving a
+  checkout or copying it to another machine. The prior solutions were preserved.
+- Release built and passed the package import audit; the VS recipe points its layout at physical
+  output and the MSIX contains the same PC-tested Dozen/DXIL hashes. `-SkipRust` preserved the
+  existing Rust library. Path, nested-junction, Dozen-selection and build-integration tests passed.
+- Follow-up review found potential junctions inside generated directories, PowerShell 7.0 API
+  incompatibilities and an integration-test gap; the scripts now check those paths and use older APIs.
+- Tests covered relative symbolic links, generated-directory junction rejection and a bad recipe in an
+  explicit build directory. Actual local PowerShell testing used 7.6.9; 7.0 was not available.
+- Both Debug and Release compiled with the new split paths; neither was launched through VS yet.
+- The new VS solution has not been run with F5. Real gamepad, console deployment, rendering and
+  audio remain unverified; `APPX0006` and the experimental Xbox status of the DLL pair remain.
+
+## 2026-11-06 - YODA: tracked root solution, approved simplification
+
+- The user stopped the expanding cache/portability work and approved a normal versioned VS entry
+  point. Canonical solution: `F:\workspace\gopher64\Gopher64UWP.slnx`, referencing only the tracked
+  port-owned `uwp/gopher64-uwp.vcxproj`. Both contain relative paths, no machine/drive assignments.
+- The project runs `prepare-host.ps1` and the existing configuration-matched Rust build before host
+  compilation/link. Fast up-to-date skipping is disabled; Rust failure blocks the host. The optional
+  `build-host.ps1` and `open-vs.ps1` now build/open this same solution, not another generated one.
+- Normal clones use normal `out`/`target` directories. YODA's existing junctions remain untouched.
+  Build output is `out/uwp-host`; only MSBuild output/layout/manifest paths are resolved physically
+  for AppX. No Windows security changes, console access, installation, or runtime launch occurred.
+- Removed the uncommitted machine/checkout hash scheme and dependency-cache isolation changes.
+  Prior generated solutions and scratch files remain preserved but are not active entry points.
+  The experimental `uwp/CMakeLists.txt` is retained and explicitly marked legacy, not the VS workflow.
+- The discarded dependency-cache probe failed during CMake's signed try-compile packaging with a
+  269-character path. The exact cause was not established; no speculative workaround was applied,
+  and the known-working dependency DLLs were not replaced.
+- Native Debug and Release builds, MSIX generation and import audits passed on PC. Both recipes
+  target physical output/layout/manifest paths. Rust compiled in both configurations; existing
+  native/Rust warnings and `APPX0006` remain visible (Debug reported 484 warnings, zero errors).
+- An isolated MSBuild failure test under a path containing spaces/apostrophe confirmed Rust failure
+  stops host output. Path tests cover ordinary clone directories, ancestor junctions and unsafe
+  AppX junction rejection. The project/recipe test checks both configurations and tracked entry point.
+- The first static project test used an outdated target name and was corrected; the first failure
+  harness used the wrong VS install-property name and was corrected. Neither was a product failure.
+- Unrelated untracked `docs/assets/exported/` and `docs/assets/fonts/` appeared during this work and
+  were left untouched. No renderer/audio/input behavior changes are part of this consolidation.
+- Next manual action: open the canonical root solution, choose **Release | x64**, set remote Xbox
+  debugging as described in [21](21-first-xbox-smoke-test.md), and let the user perform F5.
+  F5, physical gamepad and Xbox compatibility remain unverified for this new project.
+- Final read-only review found one portability mismatch: VS 2022 was still selectable while the
+  native project required v145. The project now selects v143 under VS 2022 and retains v145 under
+  VS 2026; the project contract test covers this selection. VS 2022 runtime/build is not claimed.
+- MSBuild property evaluation on the actual installed VS 2026 and VS 2022 returned v145 and v143
+  respectively. The final VS 2026 Release rebuild/package import audit also passed after this fix.
+- A newer Rust library timestamp forced native host relinking. A junction-guard mutation was rejected
+  by tests in an isolated copy, without changing production files. Both package configurations contain
+  the exact same Dozen/DXIL hashes as the PC-tested pair. No other new review blockers were reported;
+  the accumulated historical upstream-fidelity budget exceptions remain open.
