@@ -1149,3 +1149,27 @@ link/packaging errors before the console. Findings:
   generated MSIX contains the new driver hash and the same DXIL hash. PC Vulkan storage smoke
   tests passed, including negative controls; the diagnostic failure branches and Xbox are untested.
   The user alone will run Xbox F5 and provide `G64-DXIL-DIAG` and `G64-DZN-DIAG` lines.
+
+## 2026-11-06 - YODA: PSV wave-size mismatch and candidate fix
+
+- The user tested the diagnostic build on Xbox. The validator returned `0x80aa0013` and reported
+  a `PSVRuntimeInfo` mismatch: one side had minimum 0 / maximum 4294967295, the other `WaveSize=64`.
+  The UTF-8 error buffer had 898 bytes; the diagnostic logged only the first 800. The validator
+  rejected the shader; the failure was not caused merely by missing dxcompiler.
+- The public DirectXShaderCompiler v1.8.2505.1 validation source prints regenerated module state
+  as the PSV0 argument and the actual PSV as the module argument in this mismatch diagnostic. The
+  exact source of the installed validator is unverified; its displayed labels need not identify origin.
+- Mesa 25.3.3 emits explicit wave-size metadata only with DXIL minor version 6 or higher, but its
+  PSV builder sets fixed lane counts without that guard. On YODA a temporary test-only hook forced
+  minor version 5 and subgroup 64; the validator reproduced the same mismatch. Adding the missing
+  `minor_version >= 6` guard to PSV generation made that PC pipeline compile. This simulation did
+  not independently establish the Xbox shader model or prove correct shader execution.
+- Removed the test-only forcing hook before the final build. The candidate retains validation
+  diagnostics and adds the guard; its source and build remain in the local Mesa experiment, not the
+  application repo per R4. Dozen SHA-256 `CFD9F03407EFEA60E2BFE09DCB9D327A070150A3D3129A8B444548AFA9450781`
+  is in the host input; the prior diagnostic is in `out/uwp-dozen/vulkan_dzn.before-psv-fix.bak`.
+  DXIL remains unchanged. The user stopped debugging before the replacement.
+- The final candidate passed the PC storage smoke test and negative controls. Release package and
+  module audit passed; the package's Dozen hash matches. The build had 484 warnings and zero errors.
+  The user alone can perform the next F5 on Xbox; rendering, correctness, audio, input, saves,
+  performance and full Vulkan semantics remain unverified. No console access by the agent.
