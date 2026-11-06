@@ -1089,3 +1089,10 @@ link/packaging errors before the console. Findings:
 - Pending: confirm whether continuing the exception terminates or advances the game, obtain complete
   Output and module identity, then reproduce with real pipeline settings and/or produce symbols.
   Xbox validation of the candidate is still pending. No DLL was replaced and no Xbox was accessed.
+
+## 2026-11-06 - YODA: user preparing Xbox candidate test
+
+- The user intends to test the experimental candidate on Xbox despite the PC compute exception.
+  Advised using a ROM without important saves and collecting the complete Output and any call stack.
+  The current candidate and original backup hashes remain unchanged. The Xbox result is pending;
+  the agent did not connect, deploy or launch anything on the console.
