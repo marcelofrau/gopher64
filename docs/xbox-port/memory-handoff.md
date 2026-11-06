@@ -1068,3 +1068,24 @@ link/packaging errors before the console. Findings:
 - Follow-up review found the initial smoke test did not verify loaded module paths or force
   peer-thread reads. The test was corrected and repeated against both drivers; wrong shader results
   and wrong expected Dozen/DXIL module paths were rejected.
+
+## 2026-11-06 - YODA: candidate Dozen compute exception on PC
+
+- The user supplied a run with NVIDIA RTX 4070 SUPER and `native16=1`, therefore this log is from
+  PC, not the earlier Xbox adapter. The runtime reported raw/granite 8/16 storage as available,
+  initialized RDP, audio and input, and entered the emulated CPU loop. It then reported a first-chance
+  `0xC0000005` read at address `0x30` inside `vulkan_dzn.dll`, during compute pipeline creation
+  from `resolve_coherency_host_to_gpu`. The snippet does not establish whether the exception was
+  unhandled, nor definitively identify the loaded DLL hash or the exact shader.
+- The candidate binary has no PDB debug directory; no Mesa source location can be resolved from the
+  pasted absolute addresses alone. The RDP function contains two compute dispatches, for
+  `masked_rdram_resolve` and `clear_write_mask`; neither may be assumed to be the failing one.
+- Extracted the exact baked SPIR-V for both shaders and created a temporary PC-only pipeline probe
+  with matching specialization values (256, 256). Both shaders compiled successfully with both
+  the original and the candidate drivers; a separate candidate run also enabled the reported
+  8/16-bit arithmetic features. Initial original-driver probe loaded the wrong DLL because the
+  executable directory took precedence; it rejected the mismatch, and was rerun from the correct
+  directory. These tests do not reproduce the emulator's full device/pipeline state or prove a fix.
+- Pending: confirm whether continuing the exception terminates or advances the game, obtain complete
+  Output and module identity, then reproduce with real pipeline settings and/or produce symbols.
+  Xbox validation of the candidate is still pending. No DLL was replaced and no Xbox was accessed.
