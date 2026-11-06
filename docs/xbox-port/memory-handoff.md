@@ -916,3 +916,27 @@ link/packaging errors before the console. Findings:
   by tests in an isolated copy, without changing production files. Both package configurations contain
   the exact same Dozen/DXIL hashes as the PC-tested pair. No other new review blockers were reported;
   the accumulated historical upstream-fidelity budget exceptions remain open.
+
+## 2026-11-06 - YODA: restore ordinary local build directories
+
+- The user reported another junction-related deployment problem and explicitly requested ordinary
+  `out/` and `target/` directories inside the checkout after freeing local disk space. No new failure
+  log was supplied; the exact remaining junction failure was not diagnosed or claimed fixed.
+- After the user closed VS, the agent confirmed no VS/build/game processes remained. Copied 19,537
+  output files (9,300,423,018 bytes) and 26,809 target files (17,608,356,973 bytes) to local staging.
+  Robocopy reported zero failed files; a second read-only comparison found no size/timestamp/count
+  differences. SHA-256 matched both Rust libraries, both host executables and the SDL/Dozen/DXIL DLLs.
+- Four directory junctions inside discarded experiments were excluded from the copy. They and all
+  original files remain untouched in the previous storage location. No source data was deleted.
+  Removed only the two verified checkout junction entries and moved the verified copies into place;
+  both trees now contain ordinary directories, with no directory reparse points. Copy logs remain
+  in the local staging area. Approximately 9 GiB remained free after the builds.
+- Debug and Release Rust/host builds, MSIX generation and import audits passed on PC. Both deployment
+  recipes now point to the checkout's physical local output and manifest, not the former storage
+  volume. Existing warnings, including APPX0006, remain. No app was installed or run on PC or Xbox.
+- Preserved the user's VS-normalized root solution and unrelated assets without staging them.
+  The static project test was too strict about two explicit Deploy elements; it now accepts VS's
+  equivalent unconditional Deploy element while checking each configuration is enabled.
+- The sole entry point remains the tracked root `Gopher64UWP.slnx`. The user must open it via the
+  physical checkout path, select Release/x64 and retry their manual remote deployment. A separate
+  workspace alias still exists outside the checkout; it was not changed. F5/Xbox success is pending.

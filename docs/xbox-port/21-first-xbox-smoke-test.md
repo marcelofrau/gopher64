@@ -14,10 +14,11 @@ actions for the user.
 
 Open the **tracked `Gopher64UWP.slnx` at the repository root**. It references the tracked
 `uwp/gopher64-uwp.vcxproj`; neither file needs generating or contains a machine-specific drive.
-On YODA the canonical path is `F:\workspace\gopher64\Gopher64UWP.slnx`.
+The solution stays at the same relative location on every machine.
 
-A normal clone uses ordinary `out/` and `target/` directories. YODA's junctions to H: are optional
-local storage choices, not prerequisites. MSBuild calls the matching Rust build before compiling
+A normal clone uses ordinary `out/` and `target/` directories. On 2026-11-06, YODA was also moved
+back to ordinary directories after the user reported another junction-related deployment failure.
+The prior build-storage copies were preserved as backups, not active outputs. MSBuild calls the matching Rust build before compiling
 and linking the host. A failed Rust build stops the host; VS must be configured not to launch an
 older executable after a build or deployment error.
 
@@ -29,7 +30,7 @@ already present. Do not copy build caches to a new PC. Existing junctions copied
 working directory still need to point to valid local storage; scripts do not replace them.
 
 The host output is `out/uwp-host/`. Its physical deployment path is resolved for AppX;
-this keeps junctions usable without hard-coded drives or changes to Windows security. Junctions
+this avoids hard-coded drives or changes to Windows security. Junctions
 inside the configuration/AppX layout are rejected rather than silently traversed.
 
 On YODA, a temporary PC package with its own identity registered through the physical path but
@@ -37,7 +38,7 @@ failed with `0x800701C0` through both the checkout's `out` junction and a new no
 The temporary package was removed, and no security setting was changed. This is consistent with
 [Microsoft's redirection-trust policy](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-process-mitigation-redirection-trust-policy).
 The tracked project builds and generates the intended VS deployment recipe;
-its first VS F5 deployment still needs user verification.
+successful VS F5 deployment still needs user verification, including after the move to ordinary directories.
 
 Double-click `Gopher64UWP.slnx`. Optionally, to rebuild and open it from a terminal:
 

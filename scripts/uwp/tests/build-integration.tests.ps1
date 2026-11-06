@@ -5,7 +5,12 @@ $root = Resolve-UwpPhysicalPath $Root
 $project = Join-Path $root 'uwp/gopher64-uwp.vcxproj'
 [xml]$xml = Get-Content $project -Raw
 [xml]$solution = Get-Content (Join-Path $root 'Gopher64UWP.slnx') -Raw
-if ($solution.Solution.Project.Path -ne 'uwp/gopher64-uwp.vcxproj' -or $solution.Solution.Project.DefaultStartup -ne 'true' -or @($solution.Solution.Project.Deploy).Count -ne 2) { throw 'The host must be the startup/deploy project for both configurations.' }
+if ($solution.Solution.Project.Path -ne 'uwp/gopher64-uwp.vcxproj' -or $solution.Solution.Project.DefaultStartup -ne 'true') { throw 'The host must be the startup project.' }
+foreach ($configuration in 'Debug', 'Release') {
+    # VS can normalize explicit configuration entries to one unconditional Deploy element.
+    $enabled = $solution.SelectNodes("/Solution/Project/Deploy[not(@Project='false') and (not(@Solution) or @Solution='$configuration|x64' or @Solution='$configuration|*')]")
+    if (-not $enabled.Count) { throw "$configuration deployment is not enabled." }
+}
 $ns = [Xml.XmlNamespaceManager]::new($xml.NameTable)
 $ns.AddNamespace('m', 'http://schemas.microsoft.com/developer/msbuild/2003')
 if (-not (Test-Path (Join-Path $root 'Gopher64UWP.slnx'))) { throw 'Missing tracked solution.' }
