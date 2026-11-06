@@ -940,3 +940,17 @@ link/packaging errors before the console. Findings:
 - The sole entry point remains the tracked root `Gopher64UWP.slnx`. The user must open it via the
   physical checkout path, select Release/x64 and retry their manual remote deployment. A separate
   workspace alias still exists outside the checkout; it was not changed. F5/Xbox success is pending.
+
+## 2026-11-06 - YODA: user reports the physical-folder VS run appears successful
+
+- The user reports they ran the project in VS after replacing `out/` and `target/` junctions with
+  physical checkout directories and that it appears to have worked. No output log or exact
+  run/deploy/game/controller details accompanied the report; record it as user-observed success,
+  not as independent verification of ROM, input, audio, or full Xbox behavior.
+- Opening the root solution in VS normalized `Gopher64UWP.slnx`: VS added its project ID and changed
+  explicit per-configuration Deploy entries into one unconditional `<Deploy />`. Preserve that
+  generated normalization in Git; the project integration test now confirms deploy remains enabled
+  for Debug and Release. No unrelated asset files are included.
+- Fetched `origin`; it remained exactly four commits behind local before publication. The remaining
+  four local commits contain the tracked root solution, VS native host project, physical-directory
+  deployment recipe and supporting docs/scripts. After validation, publish them together.

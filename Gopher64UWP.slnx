@@ -1,12 +1,9 @@
 <Solution>
   <Configurations>
-    <BuildType Name="Debug" />
-    <BuildType Name="Release" />
     <Platform Name="x64" />
   </Configurations>
   <!-- UWP-PORT (D-02): the tracked native host is the sole VS entry point. -->
-  <Project Path="uwp/gopher64-uwp.vcxproj" DefaultStartup="true">
-    <Deploy Solution="Debug|x64" />
-    <Deploy Solution="Release|x64" />
+  <Project Path="uwp/gopher64-uwp.vcxproj" DefaultStartup="true" Id="d3a8a6bb-b92a-381c-9c64-d3a2caeeb2b4">
+    <Deploy />
   </Project>
 </Solution>
