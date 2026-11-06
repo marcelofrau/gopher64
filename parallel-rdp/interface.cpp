@@ -13,6 +13,7 @@
 // UWP-PORT: Dozen WSI integration and native logging (D-07)
 #ifdef GOPHER64_UWP
 #include "../uwp/compat/g64_gamepad_event.h"
+#include "../uwp/compat/g64_vulkan_feature_log.h"
 extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader();
 extern "C" void gopher64_uwp_log_native(const char *message);
 extern "C" void g64_uwp_install_granite_logger();
@@ -477,6 +478,15 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
     return false;
   }
 
+// UWP-PORT: log raw versus Granite storage features before RDP construction (D-07).
+#ifdef GOPHER64_UWP
+  g64_uwp_log_storage_features(vkGetPhysicalDeviceFeatures2,
+                               wsi->get_device().get_physical_device(),
+                               wsi->get_device().get_device_features().device_api_core_version,
+                               wsi->get_device().get_device_features().storage_8bit_features.sType,
+                               wsi->get_device().get_device_features().vk11_features.storageBuffer16BitAccess,
+                               wsi->get_device().get_device_features().vk12_features.storageBuffer8BitAccess);
+#endif
   rdp_new_processor();
 
 // UWP-PORT: Dozen WSI integration and native logging (D-07)

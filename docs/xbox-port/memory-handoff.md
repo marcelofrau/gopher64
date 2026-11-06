@@ -958,3 +958,34 @@ link/packaging errors before the console. Findings:
   `docs/assets/exported/` and `docs/assets/fonts/`; they were prepared in parallel for the future GUI.
   Inventory: 14 PNG assets (including eight navigation icons), two TTF fonts and one OTF font. Commit
   and push those assets separately; no asset contents were edited.
+
+## 2026-11-06 - YODA: first Xbox RDP capability failure
+
+- The user manually deployed and ran the Release app on Xbox. The frontend presented, the picker
+  staged a ROM, Rust entered `rdp_init`, Dozen loaded and negotiated interface 5, and Vulkan found
+  `Microsoft Direct3D12 (SraKmd_arden)` plus a software device. The swapchain was created before
+  paraLLEl-RDP reported `16-bit storage for SSBOs is not supported` and the debugger broke inside
+  `Renderer::init_caps`. The user continued and supplied a further stack, not a successful game frame.
+- Surface diagnostics reported 1920x1080 while the swapchain capabilities reported 3840x2160;
+  the created swapchain was 1920x1080. The relevance of this mismatch is unproven.
+- Upstream Mesa 25.3.3 `src/microsoft/vulkan/dzn_device.c` queries D3D12 OPTIONS4 and gates Vulkan
+  `storageBuffer16BitAccess` and `shaderInt16` on `Native16BitShaderOpsSupported`; 8-bit storage
+  additionally depends on its 8-bit option. The packaged Dozen reports version 25.3.3, but its
+  exact source and Xbox D3D12 query result have not been independently established. Do not equate
+  the error with a proven hardware limitation or force unsupported Vulkan features.
+- Independent reference [smash4-xbox](https://github.com/jajdp/smash4-xbox) reports a Series X
+  where native 16-bit shader operations were unavailable, and its Mesa 26.2.x patch lowers shader
+  arithmetic in that case. Its renderer and Mesa version differ from this port; lowering arithmetic
+  alone does not establish Vulkan 8-/16-bit SSBO storage support for paraLLEl-RDP.
+- Added a one-time UWP-only diagnostic before RDP construction, comparing raw Vulkan 16-/8-bit
+  storage against Granite's selected-device values and logging raw `shaderInt16`. It does not change
+  rendering or enable features. A fake Vulkan query test covers Vulkan 1.1 with/without 8-bit storage,
+  Vulkan 1.2 and missing function handling. The user stopped their debug session before the PC build.
+- The first Vulkan 1.1-extension test caught a diagnostic-formatting error (`raw8=-1` despite an
+  extension query); fixed it and reran the test. The tests now have a dedicated PowerShell runner.
+- Follow-up fidelity review moved the extension decision into port-owned code and tightened the
+  tests for feature structure types, integration wiring and independently emitted fallback logs.
+- Next: the user runs the root solution in Release on Xbox and supplies the `Dozen storage:` line
+  and any subsequent error. If raw and Granite differ, inspect capability propagation; if raw is
+  unsupported, investigate the D3D12 OPTIONS4 result and proven alternative implementations before
+  deciding whether a different Dozen/RDP approach is required. No Xbox access by the agent.
