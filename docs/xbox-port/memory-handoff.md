@@ -1031,3 +1031,40 @@ link/packaging errors before the console. Findings:
 - Potential follow-up: build a separate experimental Dozen and validate narrow/aliased SSBO accesses,
   concurrent neighbouring writes and boundaries against native storage on PC before user Xbox testing.
   The current driver/DXIL pair, existing source checkout and user backups were not replaced.
+
+## 2026-11-06 - YODA: early Xbox storage candidate
+
+- The user preferred a direct Xbox test over a longer validation phase. The regular root solution
+  remains the sole entry point; no alternate solution or automatic Xbox deployment was made.
+- Built candidate Dozen 25.3.3 from Mesa UWP commit `f1ef4e6e645f364323b09f9cebbbde780347c5dc`.
+  The exact patch is retained in the H: experiment directory; R4 requires a Mesa fork for integration.
+- The candidate exposes narrow SSBO storage and forces Mesa's existing 32-bit lowering, including
+  on the PC. It does not expose unsupported narrow arithmetic on the Xbox.
+- Source, isolated build, Python environment, Khronos glslang and smoke tests live under the
+  H: build storage. The existing Mesa 26.2.0 checkout was not modified.
+- Failed attempts: solution target names containing `@` were rejected by MSBuild; direct project
+  build then required PCH disabled and the source's `_XBOX_UWP` define. These changes are confined
+  to the generated experimental build. The candidate was built with shader cache disabled.
+- The first atomic replacement attempt failed because PowerShell passed an empty backup path; hash
+  checks proved the original unchanged. A second atomic replacement succeeded with a local backup,
+  after the user stopped debugging; the original is also independently backed up on H:.
+- Original Dozen SHA-256: `972C65469440AF3C7834A84CD2B55C87457E7DAA2E1BC660AC26180C01C2D272`.
+  Candidate SHA-256: `97306A5310B4FEEDA2B894800E5DBF5B6A2E8FB1095719118C8E072AC79CC0B1`.
+- DXIL SHA-256 remains `DB108FFEF7BCECB984BDCCF2B4725719D65B2CE7F1EBC40019DBE6C5A7016E09`.
+  The original Dozen is `out/uwp-dozen/vulkan_dzn.before-storage-test.bak` and in the H: backup.
+- On the PC NVIDIA adapter, original and candidate each passed five separate-buffer and five
+  aliased-buffer compute runs: 64 concurrent narrow writes, peer-thread reads and guard bytes.
+- The shader did not enable `shaderInt8`/`shaderInt16`; incorrect writes and reads were rejected.
+  The PC loader required the runtime directory in PATH. Tests do not establish full conformance.
+- Release build and module-level audit passed; the generated MSIX contains the candidate hash.
+  The old loose AppX layout still had the prior DLL before VS deploy; F5 must refresh the layout.
+- Expected Xbox diagnostic if the candidate is loaded: `raw16=1 raw8=1`, while the independent
+  D3D12 query may still show `native16=0`. First frame, correctness, saves and speed are untested.
+- Fidelity review flagged the Mesa patch in the application repo as violating R4. It was moved
+  back to H:; publishing it requires a Mesa fork and has not been done.
+- The standalone PC test source, shader and runner are tracked in `scripts/uwp/tests/dozen-storage*`.
+  The runner repeated both drivers and independently rejected wrong 8- and 16-bit outputs; the exact
+  source/version, configuration and compiler commands are recorded in [22](22-dozen-storage-investigation.md).
+- Follow-up review found the initial smoke test did not verify loaded module paths or force
+  peer-thread reads. The test was corrected and repeated against both drivers; wrong shader results
+  and wrong expected Dozen/DXIL module paths were rejected.

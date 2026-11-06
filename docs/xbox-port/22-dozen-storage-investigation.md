@@ -43,20 +43,90 @@ claim unsupported Vulkan features.
 
 ## Incremental plan
 
+**2026-11-06 experiment:** at the user's request, proceed to an early Xbox test
+after a small PC GPU smoke test rather than waiting for exhaustive conformance tests.
+The candidate is experimental, not a conformant general-purpose Vulkan driver.
+It uses Mesa UWP 25.3.3 at `f1ef4e6e645f364323b09f9cebbbde780347c5dc`. The candidate patch
+is retained with the experimental source on YODA, not committed to gopher64: R4 requires Mesa
+changes to live in a Mesa fork before integration.
+The patch exposes only the narrow SSBO storage capabilities and forces the existing Mesa DXIL
+lowering path on all GPUs for the experiment; it does not claim native 8/16-bit arithmetic.
+On YODA, a real Vulkan compute shader passed against both the original and candidate drivers:
+64 concurrent 8/16-bit writes and peer-thread reads, separate and aliased buffers, five runs each.
+The alias case uses adjacent non-overlapping regions; it does not prove overlapping-access semantics.
+Guard bytes stayed unchanged and deliberately wrong shaders were rejected. The shader did not
+enable `shaderInt8` or `shaderInt16`; this limited smoke test is not Vulkan conformance.
+
 1. **Done:** query D3D12 `OPTIONS4` and its HRESULT on the adapter identified by the Vulkan LUID.
    It succeeded with native16 false. The probe released its COM references; no capabilities were
    changed. [Microsoft documents](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-d3d12createdevice)
    reuse of an existing device for the same adapter in a process.
-2. Build an **isolated experimental** Dozen from Mesa UWP source without altering the existing
-   checkout or known PC-working DLLs. Reuse the proven lowering condition as a starting point.
+2. **Done:** build an experimental Dozen without modifying the existing Mesa checkout. The prior
+   DLL is preserved in verified local and external backups; the candidate is in the host's input.
    A private test build may expose candidate features only to exercise the implementation; it must
-   not be shipped as supported before semantics are validated. The packaged binary's exact source
-   and build provenance remain unverified.
-3. Before testing the emulator on Xbox, compare 8-/16-bit reads/writes against native storage on PC:
-   neighbouring-byte concurrency, boundaries, unaligned accesses, aliasing through 32-bit views and
-   representative RDP shader layouts. Measure the lowering cost and surface failures explicitly.
-4. Only after those checks, ask the user to run the experimental build on Xbox and capture capability,
-   shader compilation, first frame, correctness and performance. The user alone deploys/runs there.
+   not be shipped as supported before semantics are validated. The original prebuilt binary's exact
+   source and build provenance remain unverified.
+3. **Partially done:** the smoke test compares 8-/16-bit accesses with the original driver.
+   Boundaries, unaligned accesses, 32-bit aliasing, representative RDP shaders and performance
+   remain unvalidated and must be revisited before a production claim.
+4. Next: the user may run the experimental build on Xbox and capture capability, shader
+   compilation, first frame, correctness and performance. Only the user deploys/runs there.
 
 No step above authorizes disabling validation, silently falling back to another renderer, modifying
 the console, or treating a reported capability as successful gameplay.
+
+## Reproducing the PC smoke test
+
+The probe and shader are tracked under `scripts/uwp/tests/dozen-storage/`. They run on the PC only;
+they do not deploy, register or launch the emulator. They require a Vulkan loader, x64 VCLibs,
+the [UWP VS/CMake toolchain](17-p2-implementation-handoff.md) and `glslang` 16.6.0. Supply an existing
+Dozen/DXIL directory:
+
+```powershell
+pwsh -NoProfile -File scripts/uwp/tests/dozen-storage.tests.ps1 `
+  -DriverDirectory <dozen-directory> -Glslang <path-to-glslang.exe>
+```
+Run once with the original driver and once with the candidate; compare the printed GPU names.
+It uses the first enumerated adapter, checks loaded Dozen/DXIL paths and hashes the selected files, repeats
+separate/aliased cases five times and checks incorrect writes, reads and module paths. The tests do
+not establish Vulkan conformance.
+The YODA experiment used [Khronos glslang 16.6.0](https://github.com/KhronosGroup/glslang/releases/tag/16.6.0);
+the Windows release archive SHA-256 was `82BF434E69B9BB4829DE7E2B4BC2C5E7A7861E53D66CF75E5CC70F5F694A8D9B`.
+
+## Reconstructing the experimental driver
+
+This is developer reference, not a second application solution. The patch is local to YODA until
+it can be reviewed and moved to a Mesa fork in accordance with R4.
+
+1. Archive Mesa UWP commit `f1ef4e6e645f364323b09f9cebbbde780347c5dc` into a new directory and
+   apply the saved experimental patch there. Do not edit the existing Mesa checkout.
+2. Use `meson-uwp` commit `0379d79b0c4d1bd907fd8e1a5f5ae987a62266b8` (1.11.2) with the x64 VS
+   developer environment. YODA used Python 3.14.10 in a local virtual environment with Mako 1.3.10,
+   PyYAML 6.0.3, packaging 26.0 and PLY 3.11; no global packages were changed.
+3. Configure the Mesa snapshot using:
+
+```powershell
+$env:CC = 'cl'
+$env:CXX = 'cl'
+& <venv-python> <meson-uwp>/meson.py setup <build> <source> `
+  --backend vs2026 --uwp --buildtype release `
+  -Dvulkan-drivers=microsoft-experimental -Dgallium-drivers= -Dopengl=false `
+  -Dgles1=disabled -Dgles2=disabled -Degl=disabled -Dglx=disabled `
+  -Dplatforms=windows -Dllvm=disabled -Dzlib=disabled -Dzstd=disabled `
+  -Dexpat=disabled -Dbuild-tests=false -Dmicrosoft-clc=disabled `
+  -Dspirv-to-dxil=false -Dshader-cache=disabled -Db_vscrt=md
+```
+4. The generated UWP projects expected a precompiled header and lacked `_XBOX_UWP`. Add this
+   `Directory.Build.targets` at the build root before building the `vulkan_dzn` project:
+
+```xml
+<Project>
+  <ItemDefinitionGroup><ClCompile>
+    <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    <PreprocessorDefinitions>_XBOX_UWP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+  </ClCompile></ItemDefinitionGroup>
+</Project>
+```
+5. Build the generated `src/microsoft/vulkan/*vulkan_dzn*vcxproj` with MSBuild using
+   `Configuration=release` and `Platform=x64`. Building the solution target by name failed because
+   its generated name contains `@`; building the project directly succeeded with project references.

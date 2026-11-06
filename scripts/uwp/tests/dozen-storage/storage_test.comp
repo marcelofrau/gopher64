@@ -1,0 +1,16 @@
+#version 450
+#extension GL_EXT_shader_8bit_storage : require
+#extension GL_EXT_shader_16bit_storage : require
+layout(local_size_x = 64) in;
+layout(set = 0, binding = 0, std430) coherent buffer Bytes { uint8_t bytes[]; };
+layout(set = 0, binding = 1, std430) coherent buffer Halves { uint16_t halves[]; };
+layout(set = 0, binding = 2, std430) buffer Results { uint results[]; };
+void main() {
+    uint i = gl_LocalInvocationID.x;
+    bytes[i] = uint8_t((i * 17u + 3u) & 255u);
+    halves[i] = uint16_t((i * 1009u + 7u) & 65535u);
+    memoryBarrierBuffer();
+    barrier();
+    uint peer = (i + 1u) & 63u;
+    results[i] = uint(bytes[peer]) | (uint(halves[peer]) << 8);
+}
