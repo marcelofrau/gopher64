@@ -1096,3 +1096,21 @@ link/packaging errors before the console. Findings:
   Advised using a ROM without important saves and collecting the complete Output and any call stack.
   The current candidate and original backup hashes remain unchanged. The Xbox result is pending;
   the agent did not connect, deploy or launch anything on the console.
+
+## 2026-11-06 - YODA: candidate tested by user on Xbox
+
+- The user ran the candidate on Xbox. The Vulkan adapter was SraKmd_arden and reported
+  `raw16=1 raw8=1 shaderInt16=0 granite16=1 granite8=1`; D3D12 OPTIONS4 still returned
+  `hr=0 native16=0`. This is the experimental emulated storage exposure, not native support.
+- The RDP initialized, audio and input initialized, one gamepad was detected and opened, and the
+  emulated CPU loop started. The log does not establish a rendered game frame, audible audio or
+  working physical buttons. A compute pipeline failed in `submit_span_setup_jobs` with pipeline
+  hash `2f444097f40d7813`; the resulting RDP breakpoint stopped the session.
+- The source identifies the shader as `span_setup` with four storage buffers and a uniform texel
+  buffer. The candidate Dozen maps several failures to a generic Vulkan error: NIR-to-DXIL failure,
+  DXIL validation failure and D3D12 CreatePipelineState failure may all map to out-of-host-memory.
+  No cause can be inferred without the underlying stage/result.
+- Extracted the exact baked `span_setup` SPIR-V and compiled it on the PC with the candidate,
+  descriptor layout and non-upscaled specialization; pipeline creation succeeded. This does not
+  reproduce the Xbox driver or the full emulator state and does not prove execution correctness.
+  No changes to the app, deployed DLLs, or console were made during this investigation.
