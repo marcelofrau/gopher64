@@ -844,3 +844,11 @@ link/packaging errors before the console. Findings:
   Protocol), and a console PIN on first pairing. Use the protocol only on a trusted network.
 - No build, application launch, console access or deployment was performed. Actual controller,
   console rendering, audio, performance and deployment remain untested.
+
+## 2026-11-06 - YODA: primary solution location
+
+- The user asked why the primary solution is on H: rather than in the F: checkout. The checkout's
+  `out` is a junction to H:, and opening the generated solution through that junction previously
+  caused AppX error DEP0700 on the PC. The physical build path avoids that traversed junction.
+- No build or console access was performed. A separate checkout entry point could be considered
+  if requested, while keeping generated package paths physical; it has not been implemented.
