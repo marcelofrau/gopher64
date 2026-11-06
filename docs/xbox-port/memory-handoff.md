@@ -1126,3 +1126,26 @@ link/packaging errors before the console. Findings:
 - Next: the user deploys the root solution in Release and provides the complete Output around
   the failure, including `G64-DZN-DIAG` and `VALIDATION ERROR` if present. This build is diagnostic,
   not a fix. Continue to treat game rendering, controller buttons, audio and saves as unverified.
+
+## 2026-11-06 - YODA: Xbox DXIL validation failure
+
+- The user tested the stage diagnostic on Xbox. Storage was reported enabled, D3D12 still reported
+  native16=0, RDP initialization succeeded, audio and input initialized, and the emulated CPU
+  started. `span_setup` compute pipeline `2f444097f40d7813` then failed with
+  `G64-DZN-DIAG: DXIL validation failed: no validator message`. No first game frame was confirmed.
+- In Mesa 25.3.3 `dxil_validator.cpp`, a failed `GetStatus` result is not checked and resolving
+  the error text requires optional `dxcompiler.dll`/`IDxcLibrary`; that module was not observed
+  in the supplied partial log. A null validator, failed API call or unsuccessful validation must
+  be distinguished. The Xbox failure is not proven to be the earlier PC access violation.
+- In the isolated Mesa experiment, added diagnostics for validator null, `Validate` and `GetStatus`
+  HRESULTs, validation status and bounded UTF-8 error-buffer output when available. API failure and
+  null result are now handled without dereference; validation itself remains enabled. This is not
+  a Mesa fork integration and the scratch sources and previous source backups remain on YODA.
+- The revised Dozen SHA-256 is `CAAAF54269C1A9591C3DC4792327D6FC950A58FBFB0299CCA09497346E9BC65A`.
+  After the user stopped debugging it was placed in the host input, with the prior diagnostic DLL
+  preserved as `out/uwp-dozen/vulkan_dzn.before-validator-diagnostic.bak`. The experimental
+  storage candidate and original Dozen backups were also preserved; DXIL was not changed.
+- Release built with 484 warnings and zero errors; the module-level import audit passed, and the
+  generated MSIX contains the new driver hash and the same DXIL hash. PC Vulkan storage smoke
+  tests passed, including negative controls; the diagnostic failure branches and Xbox are untested.
+  The user alone will run Xbox F5 and provide `G64-DXIL-DIAG` and `G64-DZN-DIAG` lines.
