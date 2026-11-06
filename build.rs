@@ -172,6 +172,9 @@ fn main() {
             .file("uwp/audio/g64_xaudio2.cpp")
             .compile("g64_xaudio2");
         println!("cargo:rustc-link-lib=xaudio2");
+        // UWP-PORT: direct D3D12 capability diagnostics (D-07).
+        println!("cargo:rustc-link-lib=d3d12");
+        println!("cargo:rustc-link-lib=dxgi");
 
         let audio_bindings = bindgen::Builder::default()
             .header("uwp/audio/g64_xaudio2.h")

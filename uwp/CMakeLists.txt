@@ -59,7 +59,7 @@ target_link_libraries(gopher64-uwp PRIVATE
     "${UWP_DEPS}/lib/SDL3_ttf.lib"
     # UWP-PORT: xaudio2 is requested by the staticlib (rustc-link-lib) for the XAudio2 audio
     # backend; the final link happens here, so it must be listed explicitly. (D-08)
-    ntdll userenv ws2_32 dbghelp windowsapp xaudio2
+    ntdll userenv ws2_32 dbghelp windowsapp xaudio2 d3d12 dxgi
 )
 
 set(package_assets

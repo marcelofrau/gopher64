@@ -56,7 +56,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(Gopher64Root)target\x86_64-uwp-windows-msvc\$(RustProfile)\deps\gopher64.lib;$(Gopher64Root)out\uwp-deps\lib\SDL3.lib;$(Gopher64Root)out\uwp-deps\lib\SDL3_ttf.lib;ntdll.lib;userenv.lib;ws2_32.lib;dbghelp.lib;windowsapp.lib;xaudio2.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(Gopher64Root)target\x86_64-uwp-windows-msvc\$(RustProfile)\deps\gopher64.lib;$(Gopher64Root)out\uwp-deps\lib\SDL3.lib;$(Gopher64Root)out\uwp-deps\lib\SDL3_ttf.lib;ntdll.lib;userenv.lib;ws2_32.lib;dbghelp.lib;windowsapp.lib;xaudio2.lib;d3d12.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
       <GenerateDebugInformation>true</GenerateDebugInformation>

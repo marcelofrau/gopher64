@@ -74,6 +74,7 @@ flowchart LR
 | 19 | [Rendering bring-up on Xbox](19-rendering-bringup-xbox.md) | First-frame failure modes, log reading guide, console test order |
 | 20 | [GUI design vision](20-gui-design-vision.md) | Visual identity, menu scope and asset strategy for the P5 gamepad shell |
 | 21 | [First Xbox smoke test](21-first-xbox-smoke-test.md) | Primary solution, local Dozen/DXIL inputs, manual run and log markers |
+| 22 | [Dozen storage investigation](22-dozen-storage-investigation.md) | Xbox capability evidence, reference comparison and incremental plan |
 
 ---
 

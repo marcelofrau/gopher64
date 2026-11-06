@@ -43,6 +43,14 @@ function Resolve-UwpPhysicalPath([string]$Path, [int]$Depth = 0) {
     return $current
 }
 
+function Get-UwpCargoLibraryPath([string]$LibraryPath) {
+    $paths = $LibraryPath.Split(';') | ForEach-Object {
+        if ($_ -match '(?i)[\\/]lib[\\/]x64[\\/]store[\\/]?$') { $_ -replace '(?i)[\\/]store[\\/]?$', '' }
+        else { $_ }
+    }
+    return ($paths -join ';')
+}
+
 function Get-UwpHostBuildDir([string]$Root, [string]$Version) {
     return Resolve-UwpPhysicalPath $Root
 }

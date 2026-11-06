@@ -989,3 +989,29 @@ link/packaging errors before the console. Findings:
   and any subsequent error. If raw and Granite differ, inspect capability propagation; if raw is
   unsupported, investigate the D3D12 OPTIONS4 result and proven alternative implementations before
   deciding whether a different Dozen/RDP approach is required. No Xbox access by the agent.
+
+## 2026-11-06 - YODA: Xbox raw feature result and D3D12 probe
+
+- The user tested the diagnostic on Xbox: `raw16=0 raw8=0 shaderInt16=0 granite16=0 granite8=0`.
+  The swapchain initialized, then RDP hit its explicit 16-bit SSBO requirement. Dozen and Granite
+  agree, but this alone cannot distinguish failed D3D12 capability queries from a genuine driver limit.
+- The same run's ROM staging took about 17 seconds; the file and storage conditions are unknown, so
+  no regression is inferred. The console's audio, gamepad, gameplay and rendering remain unverified.
+- Added a plan in [22](22-dozen-storage-investigation.md). Mesa 25.3.3's DXIL backend includes a
+  32-bit narrow-access lowering pass, but its full RDP semantics are not yet proven. The separate
+  smash4-xbox patch lowers 16-bit arithmetic; it does not establish SSBO storage support.
+- Added a one-time D3D12 OPTIONS4 probe for the Vulkan device's LUID. It logs the failing stage and
+  HRESULT or the successful native16 value, without enabling features. The user stopped debugging
+  before the PC build; the agent did not access, install or run anything on the console.
+- The first MSBuild failed because Cargo's library also links the new D3D12/DXGI calls; added the
+  corresponding UWP link directives. A second build exposed a pre-existing clean-build issue:
+  MSBuild supplied the Store CRT in `LIB` to the desktop Rust build script, causing unresolved
+  `RoInitialize`, while direct Cargo succeeded. The Cargo child now uses the desktop CRT search
+  directory and restores `LIB`; the final MSBuild host still uses the UWP CRT.
+- After forcing `build.rs` to rebuild, both Release and Debug builds and package/module audits passed.
+  The PC D3D12 diagnostic returned `OPTIONS4 hr=0x00000000 native16=1` for its selected adapter;
+  mocked tests cover missing LUID and adapter lookup failure. Release contains the new diagnostic.
+  No claim is made about API-level certification, Xbox support or runtime behavior yet.
+- Import inspection shows the existing SDL3 already imports `CreateDXGIFactory1` and D3D12 ordinal
+  101, as does the new host probe; SDL3 loaded successfully in the user's previous Xbox run. This
+  does not prove that the new API calls or DXGI LUID lookup will succeed on Xbox.

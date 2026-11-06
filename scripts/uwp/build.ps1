@@ -7,6 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'common.ps1')
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $requiredFiles = @(
@@ -67,13 +68,16 @@ if ($Configuration -eq 'Release') { $cargoArgs += '--release' }
 $cargoArgs += @('--', '--crate-type', 'staticlib', '--print', 'native-static-libs')
 
 $previousBootstrap = $env:RUSTC_BOOTSTRAP
+$previousLib = $env:LIB
 Push-Location $repoRoot
 try {
     $env:RUSTC_BOOTSTRAP = '1'
+    $env:LIB = Get-UwpCargoLibraryPath $previousLib
     & rustup run $toolchain cargo @cargoArgs
     if ($LASTEXITCODE) { throw "UWP staticlib build failed ($LASTEXITCODE)." }
 } finally {
     $env:RUSTC_BOOTSTRAP = $previousBootstrap
+    $env:LIB = $previousLib
     Pop-Location
 }
 

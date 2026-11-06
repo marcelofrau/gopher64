@@ -14,6 +14,7 @@
 #ifdef GOPHER64_UWP
 #include "../uwp/compat/g64_gamepad_event.h"
 #include "../uwp/compat/g64_vulkan_feature_log.h"
+#include "../uwp/compat/g64_d3d12_feature_log.h"
 extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader();
 extern "C" void gopher64_uwp_log_native(const char *message);
 extern "C" void g64_uwp_install_granite_logger();
@@ -486,6 +487,7 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
                                wsi->get_device().get_device_features().storage_8bit_features.sType,
                                wsi->get_device().get_device_features().vk11_features.storageBuffer16BitAccess,
                                wsi->get_device().get_device_features().vk12_features.storageBuffer8BitAccess);
+  g64_uwp_log_d3d12_storage(vkGetPhysicalDeviceProperties2, wsi->get_device().get_physical_device());
 #endif
   rdp_new_processor();
 
