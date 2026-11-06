@@ -1195,3 +1195,36 @@ link/packaging errors before the console. Findings:
 - The user stopped debugging before the build. Only the user will deploy and run the next Xbox F5.
   Logs, visual correctness, performance, actual audio, controls and save integrity are unverified;
   fallback selection may be slower. Existing unrelated asset edits were not staged.
+
+## 2026-11-06 - YODA: end-of-day Xbox black-screen handoff
+
+- The user manually tested the latest Release on Xbox, then asked to stop for the day, publish all
+  changes including their icon, and leave the other agent enough context to investigate. The user
+  reported no debugger stop or visible game progress; the game window remained black. The log still
+  contains first-chance `_com_error` messages and system HRESULTs; there is no evidence they caused
+  the later black screen and no unhandled exception is reported in the supplied excerpt.
+- The console run reports `raw16=1 raw8=1`, `shaderInt16=0`, D3D12 `native16=0`, followed by
+  `subgroup size control unavailable; using RDP non-subgroup shaders` and `Allow subgroups = 0`.
+  RDP initialization succeeded, audio initialized, one SDL gamepad was detected and opened, and
+  the emulated CPU loop was entered. Compute shader hashes `2f444097f40d7813` and
+  `eb43f456d4421d5b` compiled successfully; the last log is the second compile success at 17:56:02.
+- This does not establish a rendered game frame, responsive gameplay, audible sound, working
+  controller buttons, a deadlock or its cause. Both warnings are synchronous successful shader
+  compilations. The NVIDIA PC test of the earlier storage candidate stopped with an access violation
+  in Dozen; it was not proven equivalent to this console black screen.
+- Next investigator: inspect the full sequence in [22](22-dozen-storage-investigation.md), identify
+  whether CPU execution, GPU submission, first scanout/present or the event pump progresses, and use
+  bounded diagnostic logging and user-collected debugger thread stacks. Do not assume which wait or
+  thread is responsible. Only the user may deploy to or run on Xbox.
+- The application repository includes the tracked root `Gopher64UWP.slnx`, Rust build integration,
+  UWP subgroup policy and PC storage smoke tests. The experimental Dozen source changes and the
+  tested DLL remain **local to YODA**, not versioned or uploaded: R4 requires a Mesa fork, and no
+  user-owned Mesa fork is configured. The second machine needs that fork/artifact before it can
+  reproduce the exact candidate. Source changes and build recipe are described in
+  [22](22-dozen-storage-investigation.md).
+- The active Dozen SHA-256 is `CFD9F03407EFEA60E2BFE09DCB9D327A070150A3D3129A8B444548AFA9450781`;
+  DXIL remains `DB108FFEF7BCECB984BDCCF2B4725719D65B2CE7F1EBC40019DBE6C5A7016E09`. Keep the prior
+  candidate and original driver backups; do not delete or silently replace them. The YODA build
+  drive had approximately 8.86 GiB free when this handoff was written.
+- The user explicitly requested including their modified 24x24 unplated app icon. No additional build,
+  application launch or Xbox test was started during this closeout.

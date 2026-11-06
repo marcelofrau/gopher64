@@ -43,6 +43,23 @@ claim unsupported Vulkan features.
 
 ## Incremental plan
 
+### Latest result: black screen on Xbox, 2026-11-06
+
+The user's last manual Xbox run selected the non-subgroup RDP variant (`Allow subgroups = 0`),
+initialized the swapchain and RDP, opened one detected gamepad, initialized audio, and entered the
+emulated CPU loop. Compute pipelines `2f444097f40d7813` and `eb43f456d4421d5b` compiled with
+`success: yes`. The log ends immediately after the second compilation; the user saw a black window
+with no visible progress and no debugger stop. These logs do **not** show a game frame, successful
+audio playback, working controller buttons, a deadlock, or the cause of the black screen. Earlier
+`_com_error` first-chance messages and system HRESULTs appear in the log; no causal link is proven.
+
+The `PSVRuntimeInfo` validation mismatch and the immediate subgroup configuration error were passed
+in this run, but correctness of the experimental storage emulation remains unproven. The earlier PC
+run with the storage candidate produced an access violation in Dozen; its cause also remains open.
+For the next investigator, first establish whether the CPU, GPU submission, first scanout, present,
+or event pump is making progress, using bounded diagnostics and debugger thread stacks. These are
+hypotheses to measure, not conclusions; do not make further assumptions or deploy to the console.
+
 **2026-11-06 experiment:** at the user's request, proceed to an early Xbox test
 after a small PC GPU smoke test rather than waiting for exhaustive conformance tests.
 The candidate is experimental, not a conformant general-purpose Vulkan driver.
@@ -69,8 +86,9 @@ enable `shaderInt8` or `shaderInt16`; this limited smoke test is not Vulkan conf
 3. **Partially done:** the smoke test compares 8-/16-bit accesses with the original driver.
    Boundaries, unaligned accesses, 32-bit aliasing, representative RDP shaders and performance
    remain unvalidated and must be revisited before a production claim.
-4. Next: the user may run the experimental build on Xbox and capture capability, shader
-   compilation, first frame, correctness and performance. Only the user deploys/runs there.
+4. **Partially done:** the user tested on Xbox; initialization and two shaders succeeded, but the
+   window remained black. First frame, correctness, audio, input and performance remain unresolved.
+   Only the user deploys/runs on the console.
 
 No step above authorizes disabling validation, silently falling back to another renderer, modifying
 the console, or treating a reported capability as successful gameplay.
@@ -95,8 +113,16 @@ the Windows release archive SHA-256 was `82BF434E69B9BB4829DE7E2B4BC2C5E7A7861E5
 
 ## Reconstructing the experimental driver
 
-This is developer reference, not a second application solution. The patch is local to YODA until
-it can be reviewed and moved to a Mesa fork in accordance with R4.
+This is developer reference, not a second application solution. The patch, diagnostic source, and
+DLL are local to YODA and are **not included in this repository or its remote**. They need a Mesa
+fork in accordance with R4; the other machine cannot reproduce the exact build from this repo alone.
+
+The tested candidate modifies Mesa's `dzn_device.c` to expose `KHR_8bit_storage`,
+`KHR_16bit_storage`, `storageBuffer8BitAccess` and `storageBuffer16BitAccess` experimentally;
+`dzn_pipeline.c` forces `lower_int16` to exercise 32-bit lowering; `nir_to_dxil.c` gates the PSV
+fixed-wave fields on DXIL minor version >= 6, matching the metadata emission guard. Diagnostics in
+`dzn_pipeline.c` and `dxil_validator.cpp` log the validation stage and HRESULTs. Unsupported native
+narrow arithmetic was not forced on Xbox. These changes do not prove SSBO semantics or Vulkan conformance.
 
 1. Archive Mesa UWP commit `f1ef4e6e645f364323b09f9cebbbde780347c5dc` into a new directory and
    apply the saved experimental patch there. Do not edit the existing Mesa checkout.
