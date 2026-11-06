@@ -835,3 +835,12 @@ link/packaging errors before the console. Findings:
   The remote was fetched and had no commits ahead of the local branch. Console testing remains pending.
 - Fidelity review notes that the hook inventory still lacks `src/device.rs` and `src/ui/config.rs`;
   the historical over-budget exception remains open against the local `main` baseline.
+
+## 2026-11-06 - YODA: preparing the first manual Xbox run
+
+- The user returned with Visual Studio closed and requested instructions for remote debug/deployment.
+  The primary direct solution and both local Dozen/DXIL inputs exist; the DXIL signature is valid.
+- Microsoft's Xbox UWP setup specifies the C++ Remote Machine target, Universal (Unencrypted
+  Protocol), and a console PIN on first pairing. Use the protocol only on a trusted network.
+- No build, application launch, console access or deployment was performed. Actual controller,
+  console rendering, audio, performance and deployment remain untested.
