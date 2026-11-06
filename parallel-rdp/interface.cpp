@@ -15,6 +15,7 @@
 #include "../uwp/compat/g64_gamepad_event.h"
 #include "../uwp/compat/g64_vulkan_feature_log.h"
 #include "../uwp/compat/g64_d3d12_feature_log.h"
+#include "../uwp/compat/rdp_environment.h"
 extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader();
 extern "C" void gopher64_uwp_log_native(const char *message);
 extern "C" void g64_uwp_install_granite_logger();
@@ -488,6 +489,13 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
                                wsi->get_device().get_device_features().vk11_features.storageBuffer16BitAccess,
                                wsi->get_device().get_device_features().vk12_features.storageBuffer8BitAccess);
   g64_uwp_log_d3d12_storage(vkGetPhysicalDeviceProperties2, wsi->get_device().get_physical_device());
+  // UWP-PORT: use the upstream non-subgroup variant when Granite cannot configure the requested range (D-07).
+  if (g64_uwp_configure_rdp_subgroup(
+          wsi->get_device().get_device_features().vk11_props.subgroupSize,
+          wsi->get_device().supports_subgroup_size_log2(
+              true, 5, wsi->get_device().get_device_features().vk11_props.subgroupSize == 64 ? 6 : 5,
+              VK_SHADER_STAGE_COMPUTE_BIT)))
+    gopher64_uwp_log_native("Dozen: subgroup size control unavailable; using RDP non-subgroup shaders");
 #endif
   rdp_new_processor();
 

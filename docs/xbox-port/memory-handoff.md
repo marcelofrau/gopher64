@@ -1173,3 +1173,25 @@ link/packaging errors before the console. Findings:
   module audit passed; the package's Dozen hash matches. The build had 484 warnings and zero errors.
   The user alone can perform the next F5 on Xbox; rendering, correctness, audio, input, saves,
   performance and full Vulkan semantics remain unverified. No console access by the agent.
+
+## 2026-11-06 - YODA: subgroup size incompatibility
+
+- The user tested the PSV candidate on Xbox: the previous `span_setup` compute pipeline compiled
+  (`2f444097f40d7813`, `success: yes`), then tile binning stopped with `Subgroup size configuration
+  not supported`. No game image, sound, physical control behavior, or performance was confirmed.
+- In the pinned paraLLEl-RDP source, `supports_subgroup_size_control` checks `computeFullSubgroups`
+  and size properties but not Granite's `subgroupSizeControl` feature or force-disable quirk. The
+  subsequent Granite `supports_subgroup_size_log2` checks those additional conditions. Mesa 25.3.3
+  reports `computeFullSubgroups=true` while gating `subgroupSizeControl` on shader model >= 6.6 and
+  WaveOps; the exact value and rejecting condition in this Xbox run were not directly logged.
+- Added a UWP-only pre-RDP policy: query Granite's actual support for the range requested by tile
+  binning and select the already-baked upstream `PARALLEL_RDP_SUBGROUP=0` shader variants when
+  unsupported. This disables subgroup optimization, not Vulkan, Dozen or the ubershader. The app
+  logs the choice explicitly; it does not advertise any additional GPU features.
+- Tests verified supported vs unsupported 32/64 sizes, resetting the policy across reinitialization,
+  environment overrides and sharing across translation units. Release and package/module audit
+  passed with 484 warnings and zero errors; the MSIX contains the policy and the same PSV candidate
+  Dozen hash `CFD9F03407EFEA60E2BFE09DCB9D327A070150A3D3129A8B444548AFA9450781`.
+- The user stopped debugging before the build. Only the user will deploy and run the next Xbox F5.
+  Logs, visual correctness, performance, actual audio, controls and save integrity are unverified;
+  fallback selection may be slower. Existing unrelated asset edits were not staged.
