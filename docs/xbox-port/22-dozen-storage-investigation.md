@@ -7,14 +7,15 @@
   `raw16=0 raw8=0 shaderInt16=0 granite16=0 granite8=0`.
 - paraLLEl-RDP stopped at its explicit 16-bit SSBO storage requirement. The raw Vulkan and Granite
   results agree; this is not evidence that Granite lost an advertised feature.
+- A direct D3D12 query on the same adapter succeeded: `OPTIONS4 hr=0x00000000 native16=0`.
 - Audio, gameplay, gamepad and a rendered game frame on Xbox remain unverified.
 
 ## What this establishes
 
-The Vulkan implementation used in this test does not advertise the required features. It does not
-yet distinguish the D3D12 query failing from the driver successfully reporting that native 16-bit
-operations are unavailable. Neither result proves what the physical silicon could do outside this
-UWP driver. Do not bypass the renderer check or claim unsupported Vulkan features.
+The D3D12 query succeeded, and the Xbox UWP driver reports native 16-bit operations unavailable.
+Dozen's Vulkan report matches it. This establishes a limitation of the tested UWP driver interface,
+not what the physical silicon could do outside that interface. Do not bypass the renderer check or
+claim unsupported Vulkan features.
 
 ## Reference and working hypothesis
 
@@ -30,20 +31,30 @@ UWP driver. Do not bypass the renderer check or claim unsupported Vulkan feature
 - Mesa's [DXIL compiler](https://github.com/chaotic-cx/mesa-mirror/blob/mesa-25.3.3/src/microsoft/compiler/nir_to_dxil.c#L6247)
   contains a path to lower narrow memory accesses to 32 bits, including atomic treatment for
   unaligned stores. This is a plausible emulation mechanism, not proof of full Vulkan semantics.
+- The local Mesa UWP source checkout is on 26.2.0, with a 25.3.3 remote branch available; neither
+  was modified. In both, `dzn_pipeline.c` requires native16 to be absent **and** at least one of the
+  enabled `KHR_shader_float16_int8` extension, `shaderFloat16`, or `shaderInt16` features. The log
+  reports raw `shaderInt16=0`, but does not establish the other two enabled values or the condition's
+  final result in this run.
+- The reference's patch changes that condition when native16 is absent; the compiler's lowering pass
+  then targets 32-bit memory operations. Narrow SSBO stores may become an atomic AND followed by OR.
+  Correctness under concurrent access, aliasing and descriptor boundaries must be established; a
+  successful arithmetic conversion alone is not enough.
 
 ## Incremental plan
 
-1. Query D3D12 `OPTIONS4` and its HRESULT on the same adapter identified by the Vulkan device LUID.
-   A successful query with native16 false supports a driver capability limit; a failed query needs
-   separate investigation. Keep the existing renderer and features unchanged.
-   [Microsoft documents](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-d3d12createdevice)
-   that a matching existing per-process D3D12 device is reused; the probe releases its COM references.
-2. If emulation is needed, study a **separate** Dozen build that lowers narrow SSBO operations. Do
-   not modify or replace the known PC-working pair; expose a feature only after the backend actually
-   implements its semantics. The exact packaged binary's source and build provenance must be checked.
-3. Before testing the emulator on Xbox, validate 8-/16-bit unaligned reads/writes, neighbouring-byte
-   concurrency, bounds and representative RDP shader layouts against a reference on PC, using the
-   smallest reproducible shader test. Include performance and failure reporting.
+1. **Done:** query D3D12 `OPTIONS4` and its HRESULT on the adapter identified by the Vulkan LUID.
+   It succeeded with native16 false. The probe released its COM references; no capabilities were
+   changed. [Microsoft documents](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-d3d12createdevice)
+   reuse of an existing device for the same adapter in a process.
+2. Build an **isolated experimental** Dozen from Mesa UWP source without altering the existing
+   checkout or known PC-working DLLs. Reuse the proven lowering condition as a starting point.
+   A private test build may expose candidate features only to exercise the implementation; it must
+   not be shipped as supported before semantics are validated. The packaged binary's exact source
+   and build provenance remain unverified.
+3. Before testing the emulator on Xbox, compare 8-/16-bit reads/writes against native storage on PC:
+   neighbouring-byte concurrency, boundaries, unaligned accesses, aliasing through 32-bit views and
+   representative RDP shader layouts. Measure the lowering cost and surface failures explicitly.
 4. Only after those checks, ask the user to run the experimental build on Xbox and capture capability,
    shader compilation, first frame, correctness and performance. The user alone deploys/runs there.
 

@@ -1015,3 +1015,19 @@ link/packaging errors before the console. Findings:
 - Import inspection shows the existing SDL3 already imports `CreateDXGIFactory1` and D3D12 ordinal
   101, as does the new host probe; SDL3 loaded successfully in the user's previous Xbox run. This
   does not prove that the new API calls or DXGI LUID lookup will succeed on Xbox.
+
+## 2026-11-06 - YODA: Xbox D3D12 capability confirmed
+
+- The user ran the diagnostic on Xbox: `raw16=0 raw8=0 shaderInt16=0 granite16=0 granite8=0`.
+  The selected adapter's D3D12 OPTIONS4 query succeeded with `hr=0x00000000 native16=0`; RDP then
+  stopped at its explicit 16-bit SSBO requirement.
+- The independent D3D12 query succeeded and the tested Xbox UWP driver reported no native 16-bit
+  shader operations. The Vulkan and Granite values agree. This does not reveal the HRESULT of the
+  separate query inside Dozen or characterize the physical silicon outside that driver interface.
+- Updated plan [22](22-dozen-storage-investigation.md) and reviewed the local Mesa UWP source without
+  changing it. The checkout is clean on 26.2.0, with a remote 25.3.3 branch available. In both,
+  the DXIL lowering mechanism is a candidate for 32-bit emulation but is not proven for RDP memory
+  semantics. The independent Xbox reference changes arithmetic lowering, not the storage feature.
+- Potential follow-up: build a separate experimental Dozen and validate narrow/aliased SSBO accesses,
+  concurrent neighbouring writes and boundaries against native storage on PC before user Xbox testing.
+  The current driver/DXIL pair, existing source checkout and user backups were not replaced.
