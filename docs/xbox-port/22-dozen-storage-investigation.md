@@ -111,11 +111,35 @@ not establish Vulkan conformance.
 The YODA experiment used [Khronos glslang 16.6.0](https://github.com/KhronosGroup/glslang/releases/tag/16.6.0);
 the Windows release archive SHA-256 was `82BF434E69B9BB4829DE7E2B4BC2C5E7A7861E53D66CF75E5CC70F5F694A8D9B`.
 
+## Mesa fork series (2026-11-09, supersedes the YODA-local 25.3.3 patch)
+
+The fork exists: `marcelofrau/mesa-uwp`, branch `gopher64/dzn-xbox`, based on `uwp-26.2.2`
+(`34732bbc207`) per D-17. It reimplements the YODA experiment on 26.2.2 and adds what was missing.
+In order:
+
+1. A real `nir_to_dxil` logger. The NULL logger hit `UNREACHABLE()`, which is undefined behaviour
+   in release. Failed stages and `CreatePipelineState` HRESULTs are now logged.
+2. `MESA_LOG_FILE` honored on Windows (minimal M-06).
+3. `DZN_DEBUG=no16bit` reproduces the Xbox `native16=0` caps on any GPU.
+4. 8/16-bit SSBO storage exposed without native 16-bit ops, with `lower_int16`.
+5. PSV wave lane count only for DXIL 1.6+.
+6. M-01: write-combined host-visible memory under `_XBOX_UWP`.
+
+Build with the recipe below, but check out the fork branch instead of applying a patch. The
+generated `Directory.Build.targets` also needs two more things:
+
+- `_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS`;
+- PDB generation, so the DLL ships with symbols.
+
+Details and the YODA test order are in the 2026-11-09 entry of [memory-handoff](memory-handoff.md).
+YODA's original 25.3.3 patch is still local to YODA. Pushing it to a temporary fork branch is
+pending.
+
 ## Reconstructing the experimental driver
 
-This is developer reference, not a second application solution. The patch, diagnostic source, and
-DLL are local to YODA and are **not included in this repository or its remote**. They need a Mesa
-fork in accordance with R4; the other machine cannot reproduce the exact build from this repo alone.
+This is developer reference, not a second application solution. The original YODA patch, its
+diagnostic source and DLL are local to YODA and are not included in this repository; the fork series
+above replaces them. The recipe still applies to building the fork branch.
 
 The tested candidate modifies Mesa's `dzn_device.c` to expose `KHR_8bit_storage`,
 `KHR_16bit_storage`, `storageBuffer8BitAccess` and `storageBuffer16BitAccess` experimentally;

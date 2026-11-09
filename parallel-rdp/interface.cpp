@@ -16,6 +16,7 @@
 #include "../uwp/compat/g64_vulkan_feature_log.h"
 #include "../uwp/compat/g64_d3d12_feature_log.h"
 #include "../uwp/compat/rdp_environment.h"
+#include "../uwp/compat/g64_diag.h"
 extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader();
 extern "C" void gopher64_uwp_log_native(const char *message);
 extern "C" void g64_uwp_install_granite_logger();
@@ -496,6 +497,9 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
               true, 5, wsi->get_device().get_device_features().vk11_props.subgroupSize == 64 ? 6 : 5,
               VK_SHADER_STAGE_COMPUTE_BIT)))
     gopher64_uwp_log_native("Dozen: subgroup size control unavailable; using RDP non-subgroup shaders");
+  // UWP-PORT: prove CPU writes reach the GPU (R-02/M-01) and watch for hangs (D-07).
+  g64_uwp_r02_selftest(wsi->get_device());
+  g64_uwp_watchdog_start();
 #endif
   rdp_new_processor();
 
@@ -559,6 +563,10 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
 }
 
 void rdp_close() {
+// UWP-PORT: stop the hang watchdog started in rdp_init (D-07)
+#ifdef GOPHER64_UWP
+  g64_uwp_watchdog_stop();
+#endif
   display_fps = false;
 
   g_tmem = nullptr;
@@ -817,6 +825,7 @@ void rdp_update_screen() {
       g64_first_swapchain_frame = true;
       gopher64_uwp_log_native("Dozen: first touched swapchain frame completed end_frame");
     }
+    g64_uwp_heartbeat_frame();
     if (!wsi->begin_frame()) {
       gopher64_uwp_log_native("Dozen: WSI begin_frame failed");
       callback.emu_running = false;

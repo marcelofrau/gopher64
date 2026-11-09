@@ -204,6 +204,10 @@ int main(int, char**) {
     const auto log_path = root_path / L"gopher64-host.log";
     log_file = _wfsopen(log_path.c_str(), L"a", _SH_DENYNO);
     log("Starting Gopher64 UWP; LocalState: " + root_utf8);
+    // Dozen has no stderr sink on UWP; the gopher64 Mesa fork writes MESA_LOG_FILE instead.
+    const auto mesa_log_path = root_path / L"gopher64-mesa.log";
+    if (SetEnvironmentVariableW(L"MESA_LOG_FILE", mesa_log_path.c_str()))
+        log("Mesa log: gopher64-mesa.log (needs the gopher64/dzn-xbox Dozen build)");
     gopher64_uwp_set_log_callback(rust_log);
     gopher64_uwp_set_root(root_utf8.c_str());
 

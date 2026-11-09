@@ -150,6 +150,7 @@ fn main() {
     if uwp {
         rdp_build.file("uwp/compat/dozen_loader.cpp");
         rdp_build.file("uwp/compat/g64_granite_log.cpp");
+        rdp_build.file("uwp/compat/g64_diag.cpp");
         for b in [
             &mut volk_build,
             &mut rdp_build,

@@ -27,11 +27,11 @@ Agent/model names are not machine names and do not determine their abilities or 
 - **YODA storage, 2026-11-05:** repository `out` and `target` are junctions to H:. Full pre-switch
   originals remain in the `gopher64-build-backup-20261105` directory on F:. Do not delete them
   without user approval; they still occupy F: space. H: must be available to build.
-- **Other host, name unknown:** the 2026-11-05 Opus entries below were written on another PC. Its
-  reported Rust/clang tests and host-build investigation apply to that PC only. The later probe
-  found VS 18 Build Tools and a WindowsStore v180 toolset, but its ImGui download failed and a
-  complete host MSIX build was not established. Earlier statements that it had no VS 2026 are
-  superseded by that probe; do not assume the IDE or final packaging is available there.
+- **W11-4NSYSB4** (the user calls it "Opus"; identified by `hostname` on 2026-11-09): the 2026-11-05
+  Opus entries below were written here. VS 18 Build Tools with the WindowsStore v180 toolset,
+  meson-uwp and Python 3.14 are present; on 2026-11-09 it configured and built Mesa Dozen. The
+  ImGui download failed on 2026-11-05 and a complete host MSIX build has not been established here.
+  No Xbox access. The `../mesa-uwp` checkout here has `origin` = `marcelofrau/mesa-uwp` (the fork).
 
 Older entries using "this PC", "Opus machine", "console machine" or agent labels are historical
 context, not reliable host names. Do not assign them to YODA or another name without evidence.
@@ -1228,3 +1228,98 @@ link/packaging errors before the console. Findings:
   drive had approximately 8.86 GiB free when this handoff was written.
 - The user explicitly requested including their modified 24x24 unplated app icon. No additional build,
   application launch or Xbox test was started during this closeout.
+
+## 2026-11-09 - W11-4NSYSB4: Xbox hang review, Mesa fork series, bring-up diagnostics
+
+Host `W11-4NSYSB4` ("Opus"). No Xbox access; YODA was unavailable, so YODA-only steps are listed
+as pending at the end. Reviewed YODA's 2026-11-06 work after the Xbox black-screen run.
+
+**Reading of the last Xbox run.** The user waited, heard no sound and the app looked frozen or
+extremely slow; in an earlier session an exception appeared only after a long wait. The XAudio2
+counters (`audio: input=`) are logged every ~5 s from `g64_audio_put`, i.e. the emulator thread;
+none appeared. So this is most likely a hang or a crawl, not "renders black while running". M-01
+alone would leave sound playing. Treat both as hypotheses until the diagnostics below report.
+
+**Do we need Mesa? Yes, for paraLLEl-RDP.** Research this session:
+- paraLLEl-RDP hard-requires `storageBuffer8BitAccess`/`storageBuffer16BitAccess`
+  (`parallel-rdp/.../rdp_renderer.cpp:168-178`), no fallback; `shaderInt8/16` are optional.
+- Xbox reports `native16=0`; stock Dozen ties storage to it (`../mesa-uwp/src/microsoft/vulkan/dzn_device.c`).
+- No workspace sibling runs Vulkan on Xbox (Cemu, XBSX2, dolphin, xenia, xemu: native D3D12;
+  Azahar and scummvm: Mesa for GL only). Every external Dozen-on-Xbox project patches Mesa.
+- The only paraLLEl-RDP-on-Dozen success found is desktop "Vkon12", fixed once 8/16-bit storage was
+  emulated (Themaister/parallel-rdp issue #56). No public paraLLEl-RDP-on-Xbox evidence was found.
+- So YODA's direction (emulate narrow storage in Dozen) is right. Gaps found in its execution:
+  it diverged from D-17 (local 25.3.3 patch, no fork, not reproducible: R4), went to Xbox with an
+  unexplained PC access violation in the same lowering path, and never applied M-01.
+
+**Likely root cause of both the PC crash and the Xbox hang (inferred, not yet proven).** Dozen calls
+`nir_to_dxil(nir, &opts, NULL, ...)`. With a NULL logger, nir_to_dxil's default logger prints to
+stderr and runs `UNREACHABLE()`, which in MSVC release is `__assume(0)`
+(`src/util/macros.h:131-136`): undefined behaviour on any unsupported instruction, instead of a
+clean failure. Narrow-storage lowering is exactly the kind of change that hits such paths. Also,
+Dozen's `lower_int16` only turned on when the app enabled shaderInt16/Float16/float16_int8; RDP
+enables none on Xbox, so 16-bit storage types went unlowered (same trap smash4-xbox documented).
+
+**Mesa fork series** — `marcelofrau/mesa-uwp`, branch `gopher64/dzn-xbox`, from `uwp-26.2.2`
+(`34732bbc207`) per D-17. Local commits on W11-4NSYSB4, **not pushed yet** (push needs the user's OK):
+1. `e0b7050c266` dzn: real logger for nir_to_dxil (no UNREACHABLE UB); log NIR-to-DXIL stage,
+   silent validation failures, and CreatePipelineState HRESULTs.
+2. `c0b607c9d6c` util/log: honor `MESA_LOG_FILE` on Windows (minimal M-06).
+3. `0d32c663299` dzn: `DZN_DEBUG=no16bit` clears Native16BitShaderOpsSupported, so a desktop GPU
+   reproduces the Xbox caps exactly (unlike YODA's "force lowering on all GPUs", which still
+   exposed native 16-bit arithmetic on PC).
+4. `fe2d56c90ca` dzn: expose storageBuffer16BitAccess / storageBuffer8BitAccess without native
+   16-bit ops; enabling either turns on `lower_int16`. Arithmetic, UBO and push-constant narrow
+   access stay tied to native support. Reimplemented, not copied (Cosmo's tree is unlicensed).
+5. `d6e68972f0a` compiler: PSV fixed wave lane count only for DXIL 1.6+ (YODA's validated fix).
+6. `364c8b1e0a9` dzn: under `_XBOX_UWP`, plain host-visible memory stays WRITE_COMBINE; only
+   HOST_CACHED (readback) gets WRITE_BACK (M-01, OnyxEMU 0014 idea, reimplemented).
+Not ported from YODA: its extra dxil_validator HRESULT diagnostics (its source is on YODA only).
+
+**gopher64 diagnostics (this repo).** New port-owned `uwp/compat/g64_diag.{h,cpp}`, hooked only in
+existing `#ifdef GOPHER64_UWP` blocks of `parallel-rdp/interface.cpp` plus one gated line in
+`rdp_close`, compiled from the `uwp` block of `build.rs`:
+- `R-02 cpu-write visibility: ok|FAIL|SKIPPED` — once after WSI init: CPU writes a pattern through a
+  Host-domain mapping, GPU copies it Device and back to CachedHost, compared on the CPU; fence wait
+  bounded to 5 s so a GPU hang is reported, not inherited.
+- `heartbeat: first frame presented`, then `heartbeat: frames=N (+n in the last ~2 s)`.
+- `watchdog: no frame presented yet after N s` / `...for N s` from a background thread, every 5 s.
+- Host (`uwp/host/main.cpp`) sets `MESA_LOG_FILE` to `LocalState/gopher64-mesa.log` before Dozen
+  loads; it only fills with a Dozen built from the fork (patch 2).
+UWP staticlib `cargo check` passed on W11-4NSYSB4. No PC F5, no Xbox run.
+
+**Dozen built from the fork on W11-4NSYSB4.** Release `vulkan_dzn.dll` + `vulkan_dzn.pdb` from branch
+`gopher64/dzn-xbox` at `364c8b1e0a9`, SHA-256
+`B8E5FA4EE0FD8F8DAF2FF0905D62B52F2F9B5FB94121D8E4C7F91593E90D58DD` (local build output, not
+committed, not shipped). Recipe = doc 22 §Reconstructing, plus two build-environment defines in the
+generated `Directory.Build.targets`: `_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS` (MSVC
+14.51 turns STL1011 in `uwputil`'s `<experimental/coroutine>` into an error) and PDB generation
+(`DebugInformationFormat=ProgramDatabase`, `GenerateDebugInformation=true`) so crashes symbolize.
+Python deps went into an isolated venv under `out/` (mako 1.3.10, PyYAML 6.0.3, packaging 26.0,
+PLY 3.11). `dumpbin`: exports the three `vk_icd*` entry points; imports only App CRT (`*_APP.dll`)
+and UWP API sets (plus ole32/oleaut32); no user32/gdi32. No `dxil.dll` is built: keep the
+Microsoft SDK DXIL 1.9.2602.17 pair already used on YODA. Not run on any GPU yet.
+
+### Pending for YODA (user will relay; do in order)
+
+1. `git pull` gopher64 `uwp/main`, and in `../mesa-uwp` fetch `origin` (`marcelofrau/mesa-uwp`) and
+   check out `gopher64/dzn-xbox` (after the user approves pushing it from W11-4NSYSB4).
+2. Push YODA's local experimental Mesa patch (25.3.3, incl. the dxil_validator HRESULT diagnostics)
+   to a temp branch of the fork, e.g. `yoda/storage-experiment-25.3.3`, so it is versioned (R4).
+   Do not rebase the fork series onto it; compare and port anything still missing.
+3. Build `vulkan_dzn.dll` + `.pdb` from `gopher64/dzn-xbox` (doc 22 recipe + the two defines above)
+   and put it with the existing DXIL 1.9 in `out/uwp-dozen/` (back up the current candidate as
+   `vulkan_dzn.before-fork.bak`; keep all older backups).
+4. **PC first, with `DZN_DEBUG=no16bit`** (process env, e.g. VS Debugging > Environment, or a
+   temporary `SetEnvironmentVariableW` before `LoadPackagedLibrary`): SM64 Release F5 on the NVIDIA PC.
+   Expected: `raw16=1 raw8=1 shaderInt16=0`, `R-02 cpu-write visibility: ok`, heartbeat lines.
+   Collect `gopher64-host.log` and `gopher64-mesa.log` from LocalState. If it crashes, the PDB now
+   gives a symbolized `vulkan_dzn` stack; if a pipeline fails, `gopher64-mesa.log` should contain
+   `nir_to_dxil:` / `CreatePipelineState failed` lines. Do not go to Xbox until the PC with
+   `no16bit` reaches the SM64 title screen.
+5. Only then: the user runs the same Release on Xbox (no `DZN_DEBUG` needed there; native16 is
+   already 0). Collect both logs. If it still hangs: VS **Break All**, copy all threads' stacks.
+   Read the result: `R-02 FAIL` -> M-01 incomplete; `nir_to_dxil:`/PSO lines -> a lowering gap;
+   heartbeat advancing but slow -> M-04/M-05 (PSO stalls, pipeline library) and re-check the forced
+   ubershader; no heartbeat + watchdog lines -> hang, use the stacks; device removed -> M-03.
+6. Record results here with the host name, and fill the P3 checklist (M-01/M-06/M-09 items).
