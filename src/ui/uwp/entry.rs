@@ -10,15 +10,17 @@ type LogCallback = unsafe extern "C" fn(*const c_char);
 static LOG_CALLBACK: RwLock<Option<LogCallback>> = RwLock::new(None);
 
 pub(crate) fn log(message: &str) {
-    eprintln!("[rust] {message}");
     let callback = *LOG_CALLBACK
         .read()
         .unwrap_or_else(|error| error.into_inner());
-    if let Some(callback) = callback {
-        let sanitized = message.replace('\0', "\\0");
-        if let Ok(message) = CString::new(sanitized) {
-            unsafe { callback(message.as_ptr()) };
-        }
+    // The host redirects stderr into the same log, so printing too would duplicate every line.
+    let Some(callback) = callback else {
+        eprintln!("[rust] {message}");
+        return;
+    };
+    let sanitized = message.replace('\0', "\\0");
+    if let Ok(message) = CString::new(sanitized) {
+        unsafe { callback(message.as_ptr()) };
     }
 }
 
@@ -109,7 +111,15 @@ pub unsafe extern "C" fn gopher64_uwp_set_root(root: *const c_char) {
 pub unsafe extern "C" fn gopher64_uwp_main(argc: c_int, argv: *mut *mut c_char) -> c_int {
     install_panic_hook();
     install_sdl_log_hook();
-    log("entry started");
+    log(&format!(
+        "entry started: gopher64 {} ({} Rust build)",
+        env!("GIT_DESCRIBE").trim(),
+        if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        }
+    ));
 
     let (close_tx, handle) = create_runtime();
     let _guard = handle.enter();

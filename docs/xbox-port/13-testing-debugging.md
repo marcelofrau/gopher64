@@ -36,10 +36,52 @@
 
 ## 2. Logging
 
-- Everything goes to `{root}\logs\gopher64.log` (fd-level redirect, [06 §6](06-platform-layer.md#6-logging--crash-capture)).
-- Prefixes: `[host]`, `[rust]`, `[rdp]` (parallel-rdp `LOGI/LOGW/LOGE`), `[dzn]` (Mesa log hook, M-06), `[sdl]` (`SDL_SetLogOutputFunction`).
-- Boot banner: app version, `GIT_DESCRIBE`, SDL3-uwp / Mesa commit hashes, console model if detectable, root path, memory limit.
-- Retrieve via Device Portal file explorer (LocalState) or from the external drive directly.
+**Implemented 2026-11-09** (`uwp/host/host_log.{h,cpp}`; test `scripts/uwp/tests/host-log.tests.ps1`).
+
+**Where the log goes**
+- One file: `LocalState/gopher64-host.log`. The previous run is kept as `gopher64-host.prev.log`.
+- With a debugger attached, the same lines also go to the VS Output window. Without one,
+  `OutputDebugString` is not called.
+- The whole process's stdout/stderr is redirected into the file, at the descriptor level
+  (`_dup2`) and at the Win32 handle level (`SetStdHandle`, which is what Rust's `println!` uses).
+  - So upstream Rust `println!`/`eprintln!` appear too, as do C `printf`/`fprintf(stderr)` and
+    the default stderr loggers of Granite, SDL and Mesa/Dozen. None of these need hooks.
+  - Those lines carry the pump thread's id, not the id of the thread that wrote them.
+
+**Line format:** `YYYY-MM-DD HH:MM:SS.mmm [t<thread id>] [<tag>] message`
+
+| Tag | Source |
+|---|---|
+| `[host]` | C++ host: startup, ROM picker, env.txt |
+| `[rust]` | Rust `log()` callback, panic hook |
+| `[stdio]` | anything written to stdout/stderr (upstream Rust prints, Mesa/Dozen errors, SDL, Granite on other threads) |
+| `[crash]` | an unhandled SEH exception: code, address, `module+offset`. Only when no debugger is attached; with one, VS shows it. |
+
+Inside `[rust]` lines, the message prefixes tell you where they came from:
+- `[rdp]`: Granite on the RDP thread.
+- `[sdl]`: SDL log output.
+- `Dozen:`: loader, surface, extent, frame.
+- `R-02 ...`, `heartbeat: ...`, `watchdog: ...`: `uwp/compat/g64_diag.cpp`.
+- `audio: input=...`: the XAudio2 counters, every ~5 s.
+
+**Boot lines, in order**
+- Log opened, debugger state, memory, pid.
+- Package version, device family, host Debug/Release.
+- Applied `env.txt` entries.
+- `entry started: gopher64 <GIT_DESCRIBE> (<debug|release> Rust build)`.
+- `Dozen: <path> size=… sha256=…` for `vulkan_dzn.dll` and `dxil.dll`. This identifies which
+  candidate DLL was tested.
+
+**Environment overrides without rebuilding:** put a `LocalState/env.txt` with `KEY=VALUE` lines
+(`#` comments) before launch. Examples:
+- `DZN_DEBUG=no16bit` (fork Dozen only: simulate the Xbox caps on the PC);
+- `MESA_LOG_LEVEL=info`;
+- `PARALLEL_RDP_*` knobs.
+
+`PARALLEL_RDP_UBERSHADER`, `PARALLEL_RDP_ALLOW_EXTERNAL_HOST` and (when chosen) `PARALLEL_RDP_SUBGROUP`
+are forced in `uwp/compat/rdp_environment.h` and ignore env.txt.
+
+Retrieve both log files with the Device Portal file explorer (LocalState).
 
 ## 3. Debugging tools
 

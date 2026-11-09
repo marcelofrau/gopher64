@@ -34,6 +34,7 @@ set_target_properties(gopher64-rust PROPERTIES VS_GLOBAL_DisableFastUpToDateChec
 add_executable(gopher64-uwp WIN32
     host/main.cpp
     host/dozen_probe.cpp
+    host/host_log.cpp
     "${imgui_SOURCE_DIR}/imgui.cpp"
     "${imgui_SOURCE_DIR}/imgui_draw.cpp"
     "${imgui_SOURCE_DIR}/imgui_tables.cpp"

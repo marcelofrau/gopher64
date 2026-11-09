@@ -65,6 +65,7 @@
   <ItemGroup>
     <ClCompile Include="host\main.cpp"><CompileAsWinRT>true</CompileAsWinRT></ClCompile>
     <ClCompile Include="host\dozen_probe.cpp" />
+    <ClCompile Include="host\host_log.cpp" />
     <ClCompile Include="$(Gopher64Imgui)imgui.cpp" />
     <ClCompile Include="$(Gopher64Imgui)imgui_draw.cpp" />
     <ClCompile Include="$(Gopher64Imgui)imgui_tables.cpp" />

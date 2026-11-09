@@ -16,6 +16,8 @@
 #include <sstream>
 #include <string>
 
+#include "host_log.h"
+
 int g64_dozen_probe(void (*log)(const char*), bool enable_8bit, void* core_window);
 #include <vector>
 
@@ -24,24 +26,10 @@ extern "C" void gopher64_uwp_set_log_callback(void (*callback)(const char*));
 extern "C" int gopher64_uwp_main(int argc, char** argv);
 
 namespace {
-FILE* log_file = nullptr;
-std::mutex log_mutex;
+std::mutex log_mutex; // guards last_rust_error
 std::string last_rust_error;
 
-void log(const std::string& message) {
-    std::lock_guard<std::mutex> lock(log_mutex);
-    SYSTEMTIME now{};
-    GetLocalTime(&now);
-    char timestamp[32];
-    std::snprintf(timestamp, sizeof(timestamp), "%04u-%02u-%02u %02u:%02u:%02u.%03u",
-                  now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond, now.wMilliseconds);
-    const std::string line = std::string(timestamp) + " [host] " + message + "\n";
-    OutputDebugStringA(line.c_str());
-    if (log_file) {
-        std::fputs(line.c_str(), log_file);
-        std::fflush(log_file);
-    }
-}
+void log(const std::string& message) { host_log("host", message); }
 
 void rust_log(const char* message) noexcept {
     try {
@@ -52,7 +40,7 @@ void rust_log(const char* message) noexcept {
                 std::lock_guard<std::mutex> lock(log_mutex);
                 last_rust_error = line.substr(20);
             }
-            log("[rust] " + line);
+            host_log("rust", line);
         }
     } catch (...) {
         OutputDebugStringA("[gopher64] failed to write a Rust log message\n");
@@ -61,9 +49,7 @@ void rust_log(const char* message) noexcept {
 
 void close_log() {
     gopher64_uwp_set_log_callback(nullptr);
-    std::lock_guard<std::mutex> lock(log_mutex);
-    if (log_file) std::fclose(log_file);
-    log_file = nullptr;
+    host_log_close();
 }
 
 std::string utf8(const std::wstring& text) {
@@ -201,13 +187,24 @@ int main(int, char**) {
         return 1;
     }
     const auto root_path = std::filesystem::path(root);
-    const auto log_path = root_path / L"gopher64-host.log";
-    log_file = _wfsopen(log_path.c_str(), L"a", _SH_DENYNO);
+    const bool log_file_open = host_log_open(root);
     log("Starting Gopher64 UWP; LocalState: " + root_utf8);
-    // Dozen has no stderr sink on UWP; the gopher64 Mesa fork writes MESA_LOG_FILE instead.
-    const auto mesa_log_path = root_path / L"gopher64-mesa.log";
-    if (SetEnvironmentVariableW(L"MESA_LOG_FILE", mesa_log_path.c_str()))
-        log("Mesa log: gopher64-mesa.log (needs the gopher64/dzn-xbox Dozen build)");
+#ifdef _DEBUG
+    const char* configuration = "Debug";
+#else
+    const char* configuration = "Release";
+#endif
+    try {
+        auto version = Windows::ApplicationModel::Package::Current->Id->Version;
+        auto family = Windows::System::Profile::AnalyticsInfo::VersionInfo->DeviceFamily;
+        log("package " + std::to_string(version.Major) + "." + std::to_string(version.Minor) + "." +
+            std::to_string(version.Build) + "." + std::to_string(version.Revision) + "; device family " +
+            utf8(std::wstring(family->Data(), family->Length())) + "; host build " + configuration);
+    } catch (Platform::Exception^) {
+        log("package/device information unavailable");
+    }
+    // Mesa, SDL and Granite default loggers write to stderr, which host_log redirects here.
+    host_log_apply_env_file(root_path / L"env.txt");
     gopher64_uwp_set_log_callback(rust_log);
     gopher64_uwp_set_root(root_utf8.c_str());
 
@@ -284,7 +281,7 @@ int main(int, char**) {
         }
     }
     log(status);
-    if (!log_file) status += " Host log file could not be opened; see debugger output.";
+    if (!log_file_open) status += " Host log file could not be opened; see debugger output.";
 
     int result = 0;
     bool after_game = false;

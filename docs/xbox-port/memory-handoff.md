@@ -880,7 +880,7 @@ link/packaging errors before the console. Findings:
 ## 2026-11-06 - YODA: tracked root solution, approved simplification
 
 - The user stopped the expanding cache/portability work and approved a normal versioned VS entry
-  point. Canonical solution: `F:\workspace\gopher64\Gopher64UWP.slnx`, referencing only the tracked
+  point. Canonical solution: `Gopher64UWP.slnx` at the repository root, referencing only the tracked
   port-owned `uwp/gopher64-uwp.vcxproj`. Both contain relative paths, no machine/drive assignments.
 - The project runs `prepare-host.ps1` and the existing configuration-matched Rust build before host
   compilation/link. Fast up-to-date skipping is disabled; Rust failure blocks the host. The optional
@@ -1323,3 +1323,53 @@ Microsoft SDK DXIL 1.9.2602.17 pair already used on YODA. Not run on any GPU yet
    heartbeat advancing but slow -> M-04/M-05 (PSO stalls, pipeline library) and re-check the forced
    ubershader; no heartbeat + watchdog lines -> hang, use the stacks; device removed -> M-03.
 6. Record results here with the host name, and fill the P3 checklist (M-01/M-06/M-09 items).
+
+## 2026-11-09 - W11-4NSYSB4: unified logging and crash capture (supersedes parts of the entry above)
+
+The user asked for maximum diagnostic information for YODA's tests, in a file and in the VS Output
+window. Review found that on UWP the 86 upstream Rust `println!`/`eprintln!` calls, 12 C/C++
+`printf`/`stderr` calls in the renderer glue, Granite's fallback on non-RDP threads and the default
+SDL and Mesa stderr loggers were all lost. There was no crash capture, and the log only grew.
+
+**Logging framework.** A Rust `log`/`tracing` crate would have meant editing the 86 upstream prints,
+which breaks fidelity. spdlog would have been a new dependency to do what the host already did.
+So there is no new framework. Instead, `uwp/host/host_log.{h,cpp}` (port-owned) implements the
+doc 06 §6 plan, with the redirect technique taken from Ymir:
+- one sink: file, plus VS Output only when a debugger is attached;
+- `[t<tid>] [tag]` lines;
+- rotation to `gopher64-host.prev.log`;
+- stdout/stderr redirected through a Win32 pipe with `_dup2` **and** `SetStdHandle`. Rust std writes
+  via `GetStdHandle`, so `_dup2` alone would still lose `println!`;
+- an unhandled-exception filter that writes `[crash] code, address, module+offset` with a raw
+  `WriteFile`. `AddVectoredExceptionHandler` is not in the UWP API partition; the APP-family
+  compile check caught that;
+- `LocalState/env.txt` KEY=VALUE overrides.
+
+Other changes:
+- `uwp/host/main.cpp` uses the sink and logs package version, device family and host config.
+  It no longer sets `MESA_LOG_FILE`: Mesa's stderr now lands in `gopher64-host.log` under
+  `[stdio]`, on the same timeline. `MESA_LOG_FILE` stays available through env.txt.
+- `src/ui/uwp/entry.rs` stops duplicating lines (`eprintln!` only without a host callback) and
+  logs `GIT_DESCRIBE`.
+- `uwp/compat/dozen_loader.cpp` logs path, size and SHA-256 of the loaded `vulkan_dzn.dll` and
+  `dxil.dll`.
+- The log reading guide is in [13 §2](13-testing-debugging.md#2-logging).
+
+**Verified on W11-4NSYSB4.**
+- `host_log.cpp` compiles with `WINAPI_FAMILY_APP`.
+- A desktop test exe checked CRT stdout/stderr, Win32 `GetStdHandle` writes (Rust's path), a
+  worker thread, a line without newline, env.txt parsing, rotation, and an unhandled access
+  violation. That last one logged as `[crash] unhandled exception 0xC0000005 at ... (gopher64-uwp.exe+0xf9d8)`.
+- The tracked runner `scripts/uwp/tests/host-log.tests.ps1` needs `Get-UwpVisualStudio`, which this
+  machine lacks, so the same steps were run here with VsDevCmd directly.
+- UWP staticlib check, `cargo fmt --check` and desktop `clippy --no-default-features -Dwarnings`
+  pass.
+- Not built into the MSIX here (no UWP VS component). YODA's first build will be the first
+  full-host compile of `main.cpp` with these changes.
+
+**Corrections to the YODA list above.**
+- In step 4, set `DZN_DEBUG=no16bit` with a `LocalState/env.txt` line instead of VS settings.
+- Mesa/Dozen errors (`nir_to_dxil:`, `CreatePipelineState failed`, validation) are in
+  `gopher64-host.log` as `[stdio]` lines. A separate `gopher64-mesa.log` only exists if
+  `MESA_LOG_FILE` is set in env.txt.
+- Also run `pwsh -NoProfile -File scripts/uwp/tests/host-log.tests.ps1` on YODA.
