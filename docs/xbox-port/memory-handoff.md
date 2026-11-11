@@ -1567,3 +1567,125 @@ Other changes:
     (installed in `out/uwp-dozen/` and `out/uwp-host/Release/AppX/`).
 - **Pending:** user tests **F5** on PC (**Local Machine**) and Xbox (**Remote Machine**) with
   `vulkan_dzn.dll` (`3F06E897...`).
+
+## 2026-11-11 - YODA: End-of-day checkpoint — PC working, Xbox running at 60 VI/s with deterministic visual distortion
+
+### Summary of today's state on `YODA`
+
+1. **PC (`YODA`, `RTX 4070 SUPER`, UWP Release | x64):**
+   - **Working well** after fixing the three Mesa Dozen `spirv_to_dxil` / `nir_to_dxil` bugs in
+     `marcelofrau/mesa-uwp` (`gopher64/dzn-xbox`):
+     - `c75131e7fc8`: DXIL validator HRESULT + UTF-8 error-buffer logging without `dxcompiler.dll`.
+     - `1fcac79c1ce`: Fixed MSVC 19.51 `/O2` miscompile of `ret |= nir_remove_dead_variables(...)` in
+       `dxil_spirv_nir_lower_bindless.c` (which skipped dead-variable removal whenever
+       `descriptor_sets != 0` and left duplicate `(set=0, binding=0)` variables), fixed inverted
+       `ACCESS_NON_WRITEABLE` mask in `merge_ubos_and_ssbos` (`dxil_spirv_nir.c`), and added missing
+       `var &&` null check in `emit_load_vulkan_descriptor` (`nir_to_dxil.c:4498`).
+     - `f476404419f`: Fixed the `ubershader` (`SMALL_TYPES=0`) infinite loop in `optimize_nir`
+       (`nir_to_dxil.c:6312-6352`) by clearing `nir_options.support_16bit_alu` when native 16-bit
+       shader ops are unavailable (`dzn_pipeline.c:2546`, `nir_to_dxil.c:177`, `dxil_spirv_nir.c:1039,1105`),
+       and changed `if (var == var2) continue;` to `if (var == var2) break;` in `merge_ubos_and_ssbos`
+       so `exec_node_remove` never removes `var->node.next` during `nir_foreach_variable_with_modes_safe`.
+     - `797c123548e`: Under `_XBOX_UWP` in `dzn_device.c`, forced `D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE`
+       for all `VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT` heaps (`allow_write_back = false`), separated
+       `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` (`memoryTypes[0]`) from `HOST_VISIBLE` types on UMA,
+       reported `VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU`, and made `DZN_DEBUG=no16bit,nobindless`
+       also disable `bufferDeviceAddress` and `subgroupSizeControl`.
+2. **Xbox (`SraKmd_arden`, UWP Release | x64, package `0.2506.856.3171` with `vulkan_dzn.dll` `3F06E897A3EAE1795B2B9BE9E3D610B54845154C60652D127666A3209C86F696`):**
+   - **Boot, shader compilation, CPU/RCP loop, and audio work:**
+     - The 2026-11-06 black-screen hang is completely resolved.
+     - All compute pipelines (`572be7754638c2db`, `2f444097f40d7813`, `eb43f456d4421d5b`,
+       `4f75a9cbbadf3f72` in 946 ms, `a068759de0a69d3d`, `0b13c7c0d40fe4b9` in 944 ms,
+       `8c41d15581086e49`, `80b896b170a43c92`) and graphics pipelines (`329a31d9108f93e7`,
+       `5cc13880a7414ecb`, `b3faa06830868e81`, `178546427fb3340f`, `912832d5aba6dff0`) compile
+       with `success: yes`.
+     - Emulation runs continuously at full speed (**60 VI/s**, `+120 in the last ~2 s` through
+       `frames=4009+`).
+     - XAudio2 audio plays with `underrun=0 frames` and `submit_failures=0` after initial shader
+       compilation (only minor occasional audio skips reported by user).
+   - **Remaining Xbox issue — deterministic visual distortion:**
+     - With `3F06E897...` (`797c123548e`), the Xbox screen output (`2026-11-11-15-17-21-7575.png`
+       on the title screen and `2026-11-11-15-17-30-1463.png` on the castle intro) remains heavily
+       distorted and flickering, and is **pixel-for-pixel identical** to the earlier Xbox run with
+       `0D3AB0AE...` (`2026-11-11-14-42-02-a054.png` and `2026-11-11-14-42-09-fa42.png`).
+
+### Key evidence & analysis for the next investigation session
+
+- **Failed attempt ruled out:** Changing `_XBOX_UWP` memory types in `dzn_device.c` (`797c123548e`:
+  forcing `WRITE_COMBINE` on `HOST_CACHED` and reporting `DISCRETE_GPU` / separate `DEVICE_LOCAL`)
+  did **not** alter the Xbox visual distortion at all. Because `15-17-21-7575.png` is pixel-for-pixel
+  identical to `14-42-02-a054.png`, the corruption is **100% deterministic**, not random cache
+  incoherency or a CPU/GPU race condition.
+- **Visual anatomy of the Xbox screenshots (`15-17-21-7575.png` & `15-17-30-1463.png`):**
+  - The 4:3 N64 viewport boundary inside the `1920x1080` swapchain is sharp and properly positioned
+    (so DXGI `CreateSwapChainForCoreWindow` row pitch is not skewed).
+  - Vertically (`Y`), the color regions match the actual SM64 scene:
+    - In `15-17-21-7575.png` (Title screen): top ~35% has the colors of the SM64 logo, middle ~45%
+      is solid black, and bottom ~20% has 14 repeating vertical purple/green columns where the
+      horizontal copyright/press-start text banner (~14 scanlines tall) should be.
+    - In `15-17-30-1463.png` (Castle courtyard intro): top ~25% is blue sky, followed by red
+      (castle roof), cream/yellow (castle walls), green (grass/trees), and cyan/blue (water), all
+      stretched/scrambled into horizontal bands.
+- **Headless PC probe results on `YODA` (`H:\Builds\gopher64\dzn-fork-20261111\rdp_scanout_probe.cpp`):**
+  - Linked directly against `target\x86_64-uwp-windows-msvc\release\build\gopher64-8aa56af3b27cb1c8\out\parallel-rdp.lib`
+    and `volk.lib`.
+  - Under `DZN_DEBUG=no16bit,nobindless` + `PARALLEL_RDP_SUBGROUP=0` on PC:
+    1. CPU-populated 320x240 RGBA5551 RDRAM scanned out via `proc.scanout_sync(...)` (`extract_vram` ->
+       `vi_fetch` -> `vi_divot` -> `vi_scale`) produced exact expected colors `top=(248,0,0,255)`,
+       `bot=(0,248,0,255)`.
+    2. Simple RDP `FillRectangle` (`span_setup` `2f444097f40d7813` -> `tile_binning_combined`
+       `eb43f456d4421d5b` -> `ubershader` `0b13c7c0d40fe4b9`) + `scanout_sync` produced exact
+       expected `rdram[0..3]=0x003f` and `midSample=(0,0,248,255)`.
+  - Also captured a real 56 MB SM64 RDP trace (`H:\Builds\gopher64\dzn-fork-20261111\sm64.rdp`,
+    `RDPDUMP2` format) using `PARALLEL_RDP_DUMP_PATH` on `YODA`.
+
+### Recommended next steps for the next session
+
+1. **Test PC F5 with current `uwp/compat/dozen_loader.cpp` (`DZN_DEBUG=no16bit,nobindless`) or
+   replay `H:\Builds\gopher64\dzn-fork-20261111\sm64.rdp` in `rdp_scanout_probe.exe` on `YODA`:**
+   - Note that the user's earlier successful PC run used `0D3AB0AE...` (`DZN_DEBUG=no16bit`, where
+     PC still had `device->bindless = true` and `Allow subgroups = 1`), whereas `1b6d9c4`
+     (`3F06E897...`, which sets `DZN_DEBUG=no16bit,nobindless` and forces `bindless = false` +
+     `Allow subgroups = 0`) was only tested on Xbox so far.
+   - First check whether **PC F5** (or replaying `sm64.rdp` on PC with `DZN_DEBUG=no16bit,nobindless`
+     and `PARALLEL_RDP_SUBGROUP=0`) reproduces the distortion on PC!
+     - **If PC reproduces it with `DZN_DEBUG=no16bit,nobindless`:** the bug is in the non-bindless
+       (`!device->bindless`) or `SUBGROUP=0` path in Dozen (`dzn_descriptor_set.c` / `dzn_cmd_buffer.c` /
+       `dzn_pipeline.c` / `dxil_spirv_nir.c`, e.g., `nir_opt_access` running at `dxil_spirv_nir.c:1004`
+       when `conf->inferred_read_only_images_as_srvs = !device->bindless` *before*
+       `merge_ubos_and_ssbos` at line 1126, or dynamic UBO / buffer-view descriptor table offsets in
+       non-bindless mode) and can be debugged 100% locally on PC.
+     - **If PC still renders cleanly with `DZN_DEBUG=no16bit,nobindless`:** the bug is specific to
+       the Xbox `SraKmd_arden` D3D12 driver or `wsi_common_win32.cpp` on Xbox.
+2. **Stage-by-stage narrowing on Xbox (if PC renders cleanly):**
+   - Add a one-shot diagnostic at frame 180 in `parallel-rdp/interface.cpp` (`render_frame`) that
+     logs to `gopher64-host.log`:
+     - Checksum / sample of CPU `gfx_info.RDRAM` at `VI_ORIGIN_REG`;
+     - Checksum / sample of GPU `rdram` via `processor->begin_read_rdram()`;
+     - Checksum / sample of `processor->scanout_sync(colors, w, h, options)` (which reads back
+       `scale_image` via `vkCmdCopyImageToBuffer`).
+   - Also check Xbox-specific D3D12 texture/UAV/SRV quirks from prior art (`docs/xbox-port/04-vulkan-dozen.md`
+     `M-03` / `M-11`):
+     - `extract_vram.comp` writes to `uimage2D uAAInput` (`VK_FORMAT_R8G8B8A8_UINT` UAV) which
+       `vi_fetch.frag` reads as `utexture2D` SRV (`dzn_image.c` typeless format casting on
+       `R8G8B8A8_UINT` -> `DXGI_FORMAT_R8G8B8A8_TYPELESS` vs `R8G8B8A8_UINT` on Xbox `SraKmd_arden`,
+       i.e. Azahar's `azahar-xbox-uav-cast.patch` / OnyxEMU `0011` `M-03`!).
+     - `vi_fetch.frag` and `vi_divot.frag` render to `VK_FORMAT_R8G8B8A8_UINT` 2D array color
+       attachments (`uFetchCache`, `uDivotOutput`, 2 layers when `FETCH_BUG` is active) and sample
+       them with `texelFetch` / `texelFetchOffset`.
+     - `vi_scale.frag` reads `itextureBuffer uHorizontalInfo` (`VK_FORMAT_R32G32B32A32_SINT` buffer
+       view; if `uHorizontalInfo` returns wrong `x_add`/`x_start`/`y_add`/`y_start` per scanline on
+       Xbox, every scanline will stretch/scramble horizontally in `vi_scale.frag` while keeping the
+       4:3 viewport intact!).
+
+### Canonical build / deploy / debug entry point on `YODA`
+
+- Visual Studio solution: `F:\workspace\gopher64\Gopher64UWP.slnx` (open from physical `F:\`,
+  configuration **Release | x64**).
+- Active `out\uwp-dozen\vulkan_dzn.dll` (and `out\uwp-host\Release\AppX\vulkan_dzn.dll`):
+  SHA-256 `3F06E897A3EAE1795B2B9BE9E3D610B54845154C60652D127666A3209C86F696` (built from
+  `F:\workspace\mesa-uwp` branch `gopher64/dzn-xbox` commit `797c123548e`, with matching PDB).
+- Bundled `dxil.dll`: SHA-256 `DB108FFEF7BCECB984BDCCF2B4725719D65B2CE7F1EBC40019DBE6C5A7016E09`.
+- Per user request on `YODA` (2026-11-11), pushed `marcelofrau/mesa-uwp` (`gopher64/dzn-xbox` at
+  `797c123548e`) and `marcelofrau/gopher64` (`uwp/main`) to `origin` (`SDL3-uwp` and `meson-uwp`
+  were already up to date with `origin`) so the other machine can pull directly.
