@@ -1513,3 +1513,57 @@ Other changes:
     updated and verified as `0D3AB0AE79A6ED0FD184198EE60FF53E18A98CC9C363FDA17956FA9C75E2E595`).
 - Pending: user runs **F5** on **Local Machine** (**Release | x64**) in `Gopher64UWP.slnx` to verify
   SM64 reaches the title screen on PC with `DZN_DEBUG=no16bit`, then tests on Xbox.
+
+## 2026-11-11 - YODA: Xbox first audio + 60 VI/s milestone; fixed Xbox UMA WRITE_BACK & non-bindless parity
+
+- User confirmed **Release | x64** worked well on PC (`YODA`) and deployed to Xbox (`SraKmd_arden`).
+- **Major Xbox milestone:** the 2026-11-06 black-screen hang is completely resolved on Xbox! All
+  compute (`2f444097f40d7813`, `eb43f456d4421d5b`, `4f75a9cbbadf3f72` in 947 ms, `a068759de0a69d3d`,
+  `0b13c7c0d40fe4b9` in 933 ms, `8c41d15581086e49`, `80b896b170a43c92`) and graphics shaders compiled
+  with `success: yes`, emulation ran at a steady 60 VI/s (`+120 in the last ~2 s`, `frames=3367`),
+  and XAudio2 audio played (`underrun=0 frames` after initial shader compile).
+- **Remaining Xbox symptom:** screen output on Xbox was flickering and heavily distorted into
+  horizontal colorful bands (`2026-11-11-14-42-02-a054.png`, `14-42-09-fa42.png`, `14-42-15-8b09.png`).
+- **Root-cause comparison between PC (working) and Xbox (distorted):**
+  1. **Incomplete `M-01` (`D3D12_CPU_PAGE_PROPERTY_WRITE_BACK` on `VK_MEMORY_PROPERTY_HOST_CACHED_BIT`)
+     + `VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU` on Xbox (`dzn_device.c:535-563, 828-833, 2598-2613`):**
+     - Because `pdev->architecture.UMA` is `true` on Xbox, Dozen reported `VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU`
+       and set `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` on `HOST_VISIBLE` memory types.
+     - In `parallel-rdp/rdp_device.cpp:105-108`, `VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU` caused
+       `rdram` (`device_rdram`) to be allocated with `BufferDomain::CachedCoherentHostPreferCached`,
+       while `hidden_rdram` and `tmem` (`rdp_device.cpp:124, 130`) used
+       `BufferDomain::CachedCoherentHostPreferCoherent`.
+     - Both Granite domains (`vulkan/device.cpp:3296, 3302`) have `prio[0] = HOST_VISIBLE | HOST_CACHED | HOST_COHERENT`,
+       selecting Dozen's Memory Type 2 (`VK_MEMORY_PROPERTY_HOST_CACHED_BIT`), which `364c8b1e0a9`
+       still mapped to **`D3D12_CPU_PAGE_PROPERTY_WRITE_BACK`**!
+     - Because `dzn_FlushMappedMemoryRanges` and `dzn_InvalidateMappedMemoryRanges` (`dzn_device.c:3044-3057`)
+       are no-ops and Xbox Series `WRITE_BACK` mappings are not GPU-coherent, CPU writes to `rdram`,
+       `hidden_rdram`, and `tmem` sat in the CPU cache while stale CPU cache lines evicted over GPU
+       writes. Furthermore, when `rdram->get_allocation().is_host_allocation()` was `true` on Xbox,
+       `resolve_coherency_host_to_gpu` (`rdp_renderer.cpp:2803-2830`) bypassed `staging_rdram` and
+       `vkCmdCopyBuffer` and instead `memcpy`/`memset`ted `mapped_rdram` directly on the CPU while
+       earlier GPU command buffers were still in flight (`rdp_device.cpp:1123-1128`).
+  2. **PC/Xbox feature parity (`DZN_DEBUG=no16bit,nobindless`):**
+     - On PC, `DZN_DEBUG=no16bit` still left `device->bindless = true` (`bufferDeviceAddress = true`)
+       and `subgroupSizeControl = true` (`Allow subgroups = 1`), whereas Xbox ran with
+       `device->bindless = false` and `Allow subgroups = 0`.
+- **Fixes applied (`marcelofrau/mesa-uwp` commit `797c123548e` + `uwp/compat/dozen_loader.cpp`):**
+  - Under `_XBOX_UWP` in `dzn_device.c`: keep all `VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT` heaps on
+    `D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE` (`allow_write_back = false`), keep `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT`
+    separate from `HOST_VISIBLE` types on UMA (`memoryTypes[0]` is `DEVICE_LOCAL` / `NOT_AVAILABLE`),
+    and report `VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU` so `parallel-rdp` on Xbox uses the exact same
+    `BufferDomain::Device` + `staging_rdram` (`WRITE_COMBINE`) + `vkCmdCopyBuffer` + `staging_readback`
+    (`WRITE_COMBINE`) path that works on PC.
+  - Made `DZN_DEBUG=nobindless` also disable `bufferDeviceAddress` / `KHR_buffer_device_address` and
+    `DZN_DEBUG=no16bit` disable `subgroupSizeControl`, and set `DZN_DEBUG=no16bit,nobindless` in
+    `uwp/compat/dozen_loader.cpp` so PC and Xbox execute the exact same non-bindless, non-subgroup,
+    32-bit-lowered code path.
+- **Verification on `YODA` (PC):**
+  - Built `vulkan_dzn.dll` (SHA-256 `3F06E897A3EAE1795B2B9BE9E3D610B54845154C60652D127666A3209C86F696`)
+    and `vulkan_dzn.pdb` from `gopher64/dzn-xbox` commit `797c123548e`.
+  - `uber_probe.exe` with `DZN_DEBUG=no16bit,nobindless`: **PASS** (`Compiled ubershader in 1813 ms!`).
+  - `scripts/uwp/tests/dozen-storage.tests.ps1` with `DZN_DEBUG=no16bit,nobindless`: **PASS**.
+  - `scripts/uwp/build-host.ps1 -Configuration Release -SkipDependencies -SkipRust`: **PASS**
+    (installed in `out/uwp-dozen/` and `out/uwp-host/Release/AppX/`).
+- **Pending:** user tests **F5** on PC (**Local Machine**) and Xbox (**Remote Machine**) with
+  `vulkan_dzn.dll` (`3F06E897...`).
