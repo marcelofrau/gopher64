@@ -1418,7 +1418,54 @@ Other changes:
     and `out/uwp-dozen/vulkan_dzn.dll` have newer timestamps (`2026-11-11`) than the prior
     `out/uwp-host/Release/AppX` layout (`2026-11-06`), so VS F5 Build+Deploy will refresh the
     layout automatically.
-- Pending: user runs **Release | x64** on **Local Machine (PC)** first from the canonical root
-  solution `Gopher64UWP.slnx`, selects SM64, and shares the VS Output / `gopher64-host.log`
-  (`raw16=1 raw8=1 shaderInt16=0`, `R-02 cpu-write visibility`, heartbeat/watchdog, or any
-  `nir_to_dxil:` / `DXIL:` / `[crash]` lines) before testing on Xbox.
+
+## 2026-11-11 - YODA: root-caused and fixed Dozen 0xC0000005 crash in emit_load_vulkan_descriptor
+
+- User ran **Release | x64** on PC via VS 2026 F5. The log confirmed:
+  - New `vulkan_dzn.dll` (`DEF2ACA6...`) and `dxil.dll` (`DB108FFE...`) loaded with symbols.
+  - `Dozen storage: raw16=1 raw8=1 shaderInt16=0 granite16=1 granite8=1`.
+  - `R-02 cpu-write visibility: ok (16384 words)`.
+  - `Overriding ubershader = 1`, `Falling back to 32-bit arithmetic everywhere`, `rdp_init succeeded`,
+    `audio initialized`, `entering emulated CPU loop`, and `heartbeat: first frame presented`.
+  - Then crashed with `0xC0000005: Access violation reading location 0x0000000000000034` at
+    `vulkan_dzn.dll!emit_load_vulkan_descriptor` (`src/microsoft/compiler/nir_to_dxil.c:4498`),
+    which is the exact symbolized counterpart of the `0x30` crash observed on 2026-11-06.
+- Root-cause analysis on `YODA` (reproduced in 1 second via standalone probe with
+  `VK_EXT_descriptor_indexing` + `VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC` on
+  `masked_rdram_resolve.spv` and `clear_write_mask.spv`, plus `DZN_DEBUG=no16bit,nir` and
+  `dumpbin /disasm` of `dxil_spirv_nir_lower_bindless.c.obj`):
+  1. **MSVC 19.51.36263 `/O2` miscompilation in `dxil_spirv_nir_lower_bindless`
+     (`src/microsoft/spirv_to_dxil/dxil_spirv_nir_lower_bindless.c:245`):**
+     The function wrote `ret |= nir_remove_dead_variables(nir, modes, &dead_var_options); if (!descriptor_sets) return ret; ... return true;`.
+     Because `ret` (`_Bool`) was only read inside `if (!descriptor_sets)`, MSVC 19.51 `/O2` sank
+     `call nir_remove_dead_variables` into the `if (!descriptor_sets)` branch (`test ebx, ebx; jne 0xD7`),
+     completely skipping `nir_remove_dead_variables` whenever `descriptor_sets != 0`!
+     That left all original pre-bindless UBO/SSBO variables (`set=0, binding=0`) in `nir->variables`
+     alongside the newly added `bindless_data` variable (`set=0, binding=0`). When
+     `emit_load_vulkan_descriptor` called `nir_get_binding_variable`, it saw `count > 1` variables
+     at `(set=0, binding=0)` and returned `NULL`, which `emit_load_vulkan_descriptor` dereferenced
+     without a null check (`var->data.access` at offset `0x34`).
+  2. **Inverted bitwise mask and self-match in `merge_ubos_and_ssbos`
+     (`src/microsoft/spirv_to_dxil/dxil_spirv_nir.c:852-895`):**
+     The inner loop lacked `if (var == var2) continue;`, and line 891 wrote
+     `var->data.access &= ~(other_var->data.access & ACCESS_NON_WRITEABLE);`, which *cleared*
+     `ACCESS_NON_WRITEABLE` when both aliased SSBOs were `readonly` (such as `TMEM16`/`TMEM8` and
+     `RDRAM16`/`RDRAM32` on non-bindless Xbox!) and *kept* `ACCESS_NON_WRITEABLE` when `other_var`
+     was writeable.
+  3. **Missing `var &&` guard in `emit_load_vulkan_descriptor`
+     (`src/microsoft/compiler/nir_to_dxil.c:4498`):**
+     Unlike `emit_load_ssbo` (line 3435) and `emit_get_ssbo_size` (line 4350),
+     `emit_load_vulkan_descriptor` omitted `var &&` before `var->data.access & ACCESS_NON_WRITEABLE`.
+- Fixed all three in `../mesa-uwp` on branch `gopher64/dzn-xbox` (commit `1fcac79c1ce`), rebuilt
+  `vulkan_dzn.dll` (SHA-256 `301CCFF2FF900AAE27E0A6454660565FE5568C64D57D520DC86E616905D30C97`) and
+  `vulkan_dzn.pdb`, and verified with `dumpbin /disasm` that `call nir_remove_dead_variables` now
+  executes unconditionally before `test ebx, ebx`.
+- Verification on `YODA` (PC only; no Xbox connection):
+  - Standalone bindless + dynamic-UBO repro probe on `masked_rdram_resolve.spv` and
+    `clear_write_mask.spv` with `DZN_DEBUG=no16bit`: **PASS** (both exit 0, `compute pipeline created`).
+  - `scripts/uwp/tests/dozen-storage.tests.ps1` with `DZN_DEBUG=no16bit`: **PASS**.
+  - `scripts/uwp/build-host.ps1 -Configuration Release -SkipDependencies -SkipRust`: **PASS**
+    (module audit passed; updated `out/uwp-dozen/vulkan_dzn.dll` and `out/uwp-host/Release/AppX/vulkan_dzn.dll`
+    both verified as `301CCFF2FF900AAE27E0A6454660565FE5568C64D57D520DC86E616905D30C97`).
+- Pending: user stops the paused debugger in VS 2026 and presses **F5** again on **Local Machine**
+  (**Release | x64**) to verify SM64 reaches the title screen on PC with `DZN_DEBUG=no16bit`.
