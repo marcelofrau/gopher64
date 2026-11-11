@@ -1413,6 +1413,11 @@ Other changes:
   - `scripts/uwp/build-host.ps1 -Configuration Release -SkipDependencies`: PASS (0 errors, 495
     warnings including `APPX0006`; module import audit passed; MSIX `vulkan_dzn.dll` hash verified
     as `DEF2ACA6D86A0E352E5098983EAF18EDDDF9A29F2F62FB2015F48B4930B7DD21`).
+  - Confirmed `uwp/gopher64-uwp.vcxproj` has `DisableFastUpToDateCheck=true` and runs
+    `prepare-host.ps1` + `build.ps1` on every VS build, and that both `out/uwp-host/Release/gopher64-uwp.exe`
+    and `out/uwp-dozen/vulkan_dzn.dll` have newer timestamps (`2026-11-11`) than the prior
+    `out/uwp-host/Release/AppX` layout (`2026-11-06`), so VS F5 Build+Deploy will refresh the
+    layout automatically.
 - Pending: user runs **Release | x64** on **Local Machine (PC)** first from the canonical root
   solution `Gopher64UWP.slnx`, selects SM64, and shares the VS Output / `gopher64-host.log`
   (`raw16=1 raw8=1 shaderInt16=0`, `R-02 cpu-write visibility`, heartbeat/watchdog, or any
