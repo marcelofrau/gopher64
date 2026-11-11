@@ -1469,3 +1469,47 @@ Other changes:
     both verified as `301CCFF2FF900AAE27E0A6454660565FE5568C64D57D520DC86E616905D30C97`).
 - Pending: user stops the paused debugger in VS 2026 and presses **F5** again on **Local Machine**
   (**Release | x64**) to verify SM64 reaches the title screen on PC with `DZN_DEBUG=no16bit`.
+
+## 2026-11-11 - YODA: root-caused and fixed the ubershader infinite loop (the Xbox black-screen hang)
+
+- User ran **Release | x64** on PC with `301CCFF2...`. The prior `0xC0000005` crash was gone; the
+  run presented the initial blank frames (`frames=60`), compiled three compute pipelines
+  (`572be7754638c2db`, `2f444097f40d7813`, `8feefc82a96ed037`) with `success: yes`, and then hung
+  with a black screen (`watchdog: no frame presented for 5..30 s (frames=60)`) — reproducing on PC
+  the **exact same black-screen hang** observed on Xbox on 2026-11-06!
+- Root-cause analysis on `YODA` (reproduced in a standalone `uber_probe.exe` against the baked
+  `ubershader` SPIR-V `SMALL_TYPES=0`):
+  1. **Infinite loop in `optimize_nir` (`src/microsoft/compiler/nir_to_dxil.c:6312-6352`) when
+     `lower_int16 = true`:**
+     `nir_options.support_16bit_alu` was hardcoded to `true` (`nir_to_dxil.c:157`),
+     `dxil_get_nir_compiler_options` never cleared `support_16bit_alu` when 16-bit int/float was
+     unsupported, `dzn_compute_pipeline_compile_shader` (`dzn_pipeline.c:2546`) hardcoded
+     `supported_bit_sizes = 16 | 32 | 64` (unlike graphics at line 905), and `dxil_spirv_nir.c`
+     (lines 1035, 1101) lowered shared/temp vars to 16-bit whenever `shader_model_max >= 6_2`
+     without checking `support_16bit_alu`.
+     When `optimize_nir` ran before `nir_lower_mem_access_bit_sizes` on `ubershader` (which loads
+     16-bit values from `VRAM16`/`TMEM16`/`SpanSetups` and compares them):
+     - `nir_lower_bit_size` (with `opts->lower_int16 = true`) lowered 16-bit comparisons to 32-bit
+       by inserting `u2u32`/`i2i32` casts (`progress = true`);
+     - `nir_opt_algebraic` (`nir_opt_algebraic.py:3065, 3085-3125`, gated on `options->support_16bit_alu`)
+       immediately folded comparisons of `u2u32(a@16)` back to 16-bit comparisons (`progress = true`);
+     - `do { ... } while (progress);` spun forever at 100% CPU!
+  2. **Safe list iteration in `merge_ubos_and_ssbos` (`src/microsoft/spirv_to_dxil/dxil_spirv_nir.c:859`):**
+     Proactively testing `uber_probe.exe` with `DZN_DEBUG=no16bit,nobindless` (simulating Xbox's
+     non-bindless mode on PC) caught that `if (var == var2) continue;` allowed `other_var` to match
+     `var->node.next`, corrupting `nir_foreach_variable_with_modes_safe`'s saved `next` pointer when
+     `exec_node_remove(&other_var->node)` ran. Changed to `if (var == var2) break;` so `var2` only
+     searches variables preceding `var`.
+- Verification on `YODA` (PC only; no Xbox connection):
+  - Built `vulkan_dzn.dll` (SHA-256 `0D3AB0AE79A6ED0FD184198EE60FF53E18A98CC9C363FDA17956FA9C75E2E595`)
+    and `vulkan_dzn.pdb` from `gopher64/dzn-xbox` commit `f476404419f`.
+  - `uber_probe.exe` on baked `ubershader` (`SMALL_TYPES=0, SUBGROUP=1` and `SUBGROUP=0`):
+    - Before fix: timed out (infinite loop).
+    - After fix with `DZN_DEBUG=no16bit` (bindless): **PASS in 235 ms** (`SUBGROUP=0`) / **1781 ms** (`SUBGROUP=1`).
+    - After fix with `DZN_DEBUG=no16bit,nobindless` (Xbox non-bindless path): **PASS in 1688 ms**.
+  - `scripts/uwp/tests/dozen-storage.tests.ps1` with `DZN_DEBUG=no16bit`: **PASS**.
+  - `scripts/uwp/build-host.ps1 -Configuration Release -SkipDependencies -SkipRust`: **PASS**
+    (module audit passed; `out/uwp-dozen/vulkan_dzn.dll` and `out/uwp-host/Release/AppX/vulkan_dzn.dll`
+    updated and verified as `0D3AB0AE79A6ED0FD184198EE60FF53E18A98CC9C363FDA17956FA9C75E2E595`).
+- Pending: user runs **F5** on **Local Machine** (**Release | x64**) in `Gopher64UWP.slnx` to verify
+  SM64 reaches the title screen on PC with `DZN_DEBUG=no16bit`, then tests on Xbox.
