@@ -1373,3 +1373,24 @@ Other changes:
   `gopher64-host.log` as `[stdio]` lines. A separate `gopher64-mesa.log` only exists if
   `MESA_LOG_FILE` is set in env.txt.
 - Also run `pwsh -NoProfile -File scripts/uwp/tests/host-log.tests.ps1` on YODA.
+
+## 2026-11-11 - YODA: context and handoff inspection
+
+- Read-only context check on `YODA` at the start of the session.
+- `gopher64` is clean on `uwp/main` at `0399db6` (`uwp: unified host log with stdio capture, crash
+  logging and env.txt (D-02)`), which already includes the `W11-4NSYSB4` diagnostics (`g64_diag`,
+  `R-02`, heartbeat/watchdog) and unified `host_log` changes.
+- Checked `../mesa-uwp`: `origin` currently points to `SternXD/mesa-uwp` (checked out at
+  `uwp-26.2.0`), while the fork `marcelofrau/mesa-uwp` already has `gopher64/dzn-xbox` published at
+  `364c8b1e0a995379c73d8e346954944606f410f0` (based on `uwp-26.2.2`).
+- `out/uwp-dozen/vulkan_dzn.dll` on `YODA` is still the 2026-11-06 local 25.3.3 PSV candidate
+  (`9,964,032` bytes), with the four `.bak` files and `dxil.dll` intact.
+- No files were modified outside this journal, and no build, PC launch or Xbox action was run.
+- Pending (awaiting user go-ahead):
+  1. Point `../mesa-uwp` at `marcelofrau/mesa-uwp` (or add remote), archive YODA's local 25.3.3
+     patch to a temp branch (`yoda/storage-experiment-25.3.3`) and port any missing `dxil_validator`
+     HRESULT diagnostics to `gopher64/dzn-xbox`.
+  2. Build `vulkan_dzn.dll` + `.pdb` from `gopher64/dzn-xbox` on YODA and back up the current DLL
+     as `out/uwp-dozen/vulkan_dzn.before-fork.bak`.
+  3. Run `scripts/uwp/tests/host-log.tests.ps1` and rebuild the host on YODA.
+  4. Test on PC first with `DZN_DEBUG=no16bit` in `LocalState/env.txt` before any user Xbox run.
