@@ -1386,11 +1386,34 @@ Other changes:
 - `out/uwp-dozen/vulkan_dzn.dll` on `YODA` is still the 2026-11-06 local 25.3.3 PSV candidate
   (`9,964,032` bytes), with the four `.bak` files and `dxil.dll` intact.
 - No files were modified outside this journal, and no build, PC launch or Xbox action was run.
-- Pending (awaiting user go-ahead):
-  1. Point `../mesa-uwp` at `marcelofrau/mesa-uwp` (or add remote), archive YODA's local 25.3.3
-     patch to a temp branch (`yoda/storage-experiment-25.3.3`) and port any missing `dxil_validator`
-     HRESULT diagnostics to `gopher64/dzn-xbox`.
-  2. Build `vulkan_dzn.dll` + `.pdb` from `gopher64/dzn-xbox` on YODA and back up the current DLL
-     as `out/uwp-dozen/vulkan_dzn.before-fork.bak`.
-  3. Run `scripts/uwp/tests/host-log.tests.ps1` and rebuild the host on YODA.
-  4. Test on PC first with `DZN_DEBUG=no16bit` in `LocalState/env.txt` before any user Xbox run.
+
+## 2026-11-11 - YODA: Mesa fork Dozen build, validator diagnostics port, and hardcoded no16bit
+
+- In `../mesa-uwp`, renamed `origin` (`SternXD/mesa-uwp`) to `upstream` and added `origin`
+  (`marcelofrau/mesa-uwp`).
+- Archived YODA's local 2026-11-06 25.3.3 experimental patch on local branch
+  `yoda/storage-experiment-25.3.3` (`279f1c6c43c` on top of `f1ef4e6e645f`), then checked out
+  `gopher64/dzn-xbox` (`364c8b1e0a9`) and ported YODA's `dxil_validator.cpp` null/HRESULT checks
+  and direct UTF-8 error-buffer extraction without `dxcompiler.dll` as commit `c75131e` (not pushed
+  yet; awaiting user authorization).
+- Configured and built `vulkan_dzn.dll` (`11,037,696` bytes, SHA-256
+  `DEF2ACA6D86A0E352E5098983EAF18EDDDF9A29F2F62FB2015F48B4930B7DD21`) and `vulkan_dzn.pdb`
+  (`23,351,296` bytes) in Release/x64 from `gopher64/dzn-xbox` (`c75131e`).
+- Backed up the previous `out/uwp-dozen/vulkan_dzn.dll` (`CFD9F034...`) to
+  `out/uwp-dozen/vulkan_dzn.before-fork.bak` and installed the new `vulkan_dzn.dll` and
+  `vulkan_dzn.pdb` into `out/uwp-dozen/` (and copied `vulkan_dzn.pdb` into `out/uwp-host/Release/`).
+- Per user request, hardcoded `SetEnvironmentVariableW(L"DZN_DEBUG", L"no16bit")` in
+  `uwp/compat/dozen_loader.cpp` so PC F5 reproduces Xbox `native16=0` directly without needing a
+  manual `LocalState/env.txt` file.
+- Verification on `YODA` (PC only; no Xbox connection or deployment):
+  - `scripts/uwp/tests/host-log.tests.ps1`: PASS (`unhandled fault logged with module and offset`).
+  - `scripts/uwp/tests/dozen-storage.tests.ps1` with `DZN_DEBUG=no16bit`: PASS against
+    `DEF2ACA6D86A0E352E5098983EAF18EDDDF9A29F2F62FB2015F48B4930B7DD21` (`storage16=1 storage8=1
+    shaderInt16=0`, 64 concurrent 8/16-bit writes, reads, guard bytes, and negative controls).
+  - `scripts/uwp/build-host.ps1 -Configuration Release -SkipDependencies`: PASS (0 errors, 495
+    warnings including `APPX0006`; module import audit passed; MSIX `vulkan_dzn.dll` hash verified
+    as `DEF2ACA6D86A0E352E5098983EAF18EDDDF9A29F2F62FB2015F48B4930B7DD21`).
+- Pending: user runs **Release | x64** on **Local Machine (PC)** first from the canonical root
+  solution `Gopher64UWP.slnx`, selects SM64, and shares the VS Output / `gopher64-host.log`
+  (`raw16=1 raw8=1 shaderInt16=0`, `R-02 cpu-write visibility`, heartbeat/watchdog, or any
+  `nir_to_dxil:` / `DXIL:` / `[crash]` lines) before testing on Xbox.

@@ -44,6 +44,13 @@ extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader() {
         gopher64_uwp_log_native(message);
         return nullptr;
     }
+    // shortcut: hardcoded DZN_DEBUG=no16bit so PC reproduces Xbox native16=0 during bring-up, remove after P3 validation
+    if (!SetEnvironmentVariableW(L"DZN_DEBUG", L"no16bit")) {
+        char message[128];
+        std::snprintf(message, sizeof(message), "Dozen: setting DZN_DEBUG=no16bit failed: %lu", GetLastError());
+        gopher64_uwp_log_native(message);
+        return nullptr;
+    }
 
     static HMODULE module = nullptr;
     if (!module) module = LoadPackagedLibrary(L"vulkan_dzn.dll", 0);
@@ -80,6 +87,6 @@ extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader() {
     std::snprintf(message, sizeof(message), "Dozen: ICD negotiation result=%d, interface=%u", result, version);
     gopher64_uwp_log_native(message);
     if (result != VK_SUCCESS || version < 5) return nullptr;
-    gopher64_uwp_log_native("Dozen: 8-bit storage requested; UWP RDP host import forced off");
+    gopher64_uwp_log_native("Dozen: 8-bit storage and DZN_DEBUG=no16bit requested; UWP RDP host import forced off");
     return gipa;
 }
