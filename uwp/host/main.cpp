@@ -189,6 +189,7 @@ int main(int, char**) {
     const auto root_path = std::filesystem::path(root);
     const bool log_file_open = host_log_open(root);
     log("Starting Gopher64 UWP; LocalState: " + root_utf8);
+    SetEnvironmentVariableW(L"G64_LOCALSTATE", root.c_str()); // where the VI probe writes its BMP dumps (D-07)
 #ifdef _DEBUG
     const char* configuration = "Debug";
 #else

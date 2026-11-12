@@ -713,6 +713,10 @@ static void render_frame(Vulkan::Device &device) {
     }
   }
 
+// UWP-PORT: env-driven VI stage bisect and stage dump for the Xbox distortion (D-07)
+#ifdef GOPHER64_UWP
+  g64_uwp_vi_probe(*processor, options, gfx_info.RDRAM, gfx_info.RDRAM_SIZE);
+#endif
   Vulkan::ImageHandle image = processor->scanout(options);
 
   Vulkan::ResourceLayout vertex_layout = {};
@@ -799,6 +803,10 @@ static void render_frame(Vulkan::Device &device) {
 }
 
 void rdp_set_vi_register(uint32_t reg, uint32_t value) {
+// UWP-PORT: latch VI registers for the VI probe dump (D-07)
+#ifdef GOPHER64_UWP
+  g64_uwp_vi_note_register(reg, value);
+#endif
   processor->set_vi_register(RDP::VIRegister(reg), value);
 }
 

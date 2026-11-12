@@ -157,7 +157,7 @@ Status: ✔ landed (P1 blocks 1–6) · ○ planned (P1 block 8 / P2+).
 | `src/ui/netplay.rs` | none — already `cfg(feature = "gui")`, excluded by `--no-default-features` | D-09 | 0 | ✔ |
 | `src/retroachievements.rs` | Discord `use`/`init_rich_presence` gated + no-op; inner `cfg_attr(uwp, allow(dead_code))` for the Discord-only binding | D-09 | ~19 | ✔ |
 | `src/ui/usb.rs` | Gated | D-09 | ~3 | ○ |
-| `parallel-rdp/interface.cpp` | UWP-only Dozen/WSI diagnostics, subgroup-variant policy hook and gamepad relay; temporary always-on FPS OSD (D-07 triage shortcut); suspend-teardown remains pending | D-04, D-07, D-18 | growing | ✔ (experimental) |
+| `parallel-rdp/interface.cpp` | UWP-only Dozen/WSI diagnostics, subgroup-variant policy hook and gamepad relay; temporary always-on FPS OSD (D-07 triage shortcut); VI-distortion probe hooks (`g64_uwp_vi_probe` before `scanout` in `render_frame`, `g64_uwp_vi_note_register` in `rdp_set_vi_register`; remove after triage); suspend-teardown remains pending | D-04, D-07, D-18 | growing | ✔ (experimental) |
 | `parallel-rdp/wsi_platform.cpp` | UWP-only Mesa CoreWindow surface creation/destruction | D-07 | ~35 | ✔ (PC surface probe) |
 | **Historical P1 b1–6 snapshot (not current total)** | **8 upstream files** | | **~130** | |
 
