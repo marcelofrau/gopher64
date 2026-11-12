@@ -3,7 +3,7 @@
 Audience: the console machine (VS 2026 + Xbox). This condenses what the proven Xbox ports in the
 workspace (Ymir D3D12 on CoreWindow; scummvm-uwp) and the mesa-uwp Dozen WSI tell us about getting
 an image on screen, so the first-frame work is directed instead of trial-and-error. Evidence and
-file:line references are in `memory-handoff.md` (2026-11-05 research entries). PC agents cannot test
+file:line references are in the [2026-11-04/05 journal archive](handoff-archive/2026-11-04-05.md) (2026-11-05 research entries). PC agents cannot test
 any of this; it is console-only.
 
 ## 0. Mental model

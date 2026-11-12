@@ -131,7 +131,7 @@ generated `Directory.Build.targets` also needs two more things:
 - `_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS`;
 - PDB generation, so the DLL ships with symbols.
 
-Details and the YODA test order are in the 2026-11-09 entry of [memory-handoff](memory-handoff.md).
+Details and the YODA test order are in the [2026-11-09 journal archive](handoff-archive/2026-11-09.md).
 YODA's original 25.3.3 patch is still local to YODA. Pushing it to a temporary fork branch is
 pending.
 
