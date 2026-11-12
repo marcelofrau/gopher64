@@ -53,14 +53,19 @@ below. Never delete history.
   plays.
   - **Open blocker:** the image is deterministically distorted. Vertical placement is right, but
     each scanline is scrambled horizontally into coloured bands.
-  - The full investigation plan is [23 — Xbox visual distortion plan](23-xbox-visual-distortion-plan.md).
+  - **Two candidate root causes are fixed but untested:** Mesa `c0ea943b3b1`, F1 + F2 in doc 23 §5.
+  - **Next step:** follow [23 — Xbox visual distortion plan](23-xbox-visual-distortion-plan.md) §7
+    in order (Step 0, P1, X1, ...).
 - **Mesa fork:** `marcelofrau/mesa-uwp`, branch `gopher64/dzn-xbox`.
   - Published up to `797c123548e`.
-  - `d0b7c8827ab` (`G64-DZN-CAPS` log + `DZN_DEBUG=legacycaps`) exists only on W11-4NSYSB4, waiting
-    for the user to approve a push.
+  - Local commits on W11-4NSYSB4, waiting for the user to approve a push:
+    - `d0b7c8827ab`: `G64-DZN-CAPS` + `legacycaps`;
+    - `99ebfcfba5a`: `G64-DZN-FMT`;
+    - `0d5764304ac`: `DZN_G64_MAX_SHADER_MODEL`;
+    - `c0ea943b3b1`: sync2 layouts in legacy barriers + `*_ARRAY` views, toggle `DZN_G64_DISABLE_FIX`.
   - Build recipe: [22 §Reconstructing](22-dozen-storage-investigation.md#reconstructing-the-experimental-driver).
-- **gopher64 `uwp/main`:** the latest local commits (`b9049ac`, `781f4d9`, plus this compaction) are
-  not pushed yet.
+- **gopher64 `uwp/main`:** the local commits `b9049ac`, `781f4d9`, `6a7962c` and `2218981`, plus
+  the doc 23 commit, are not pushed yet.
 - **Machine rules:**
   - W11-4NSYSB4 is corporate. Never launch the emulator, a ROM or any game window there; only builds
     and headless checks.
@@ -160,3 +165,42 @@ below. Never delete history.
   - The Xbox reports any of the four caps as 1: make `legacycaps` match the real Xbox values.
   - The FPS text is clean on Xbox: the final blit and swapchain path are fine.
 - User rule (2026-11-12): on `W11-4NSYSB4` (corporate), never launch the emulator, a ROM or anything that opens a game window. Only builds and headless checks are allowed there.
+
+## 2026-11-12 - W11-4NSYSB4: journal compaction, VI probe, two Dozen root-cause fixes, plan doc 23
+
+- **Journal:** compacted to Current state + History + Recent entries. The full old entries are
+  verbatim in `handoff-archive/` (2026-11-04-05, 11-06, 11-09, 11-11), with absolute paths
+  replaced. Links in docs 19 and 22 were updated.
+- **Research (two subagents):**
+  - Prior art: OnyxEMU `0011`/`0034`, Azahar `azahar-xbox-uav-cast.patch` and
+    `rodrigoandrigo/Mesa-UWP` say the Xbox runtime lacks relaxed casting and some typed UAV loads.
+    No paraLLEl-RDP shader uses `imageLoad`, so typed loads are unlikely to be the cause.
+  - No public paraLLEl-RDP-on-Xbox project exists.
+  - A code map of the VI resources and Dozen paths found two real Dozen bugs that only matter on
+    Xbox/AMD (doc 23 §5).
+- **Mesa fork commits (local, not pushed):**
+  - `99ebfcfba5a`: `G64-DZN-FMT` per-format support log.
+  - `0d5764304ac`: `DZN_G64_MAX_SHADER_MODEL` clamp.
+  - `c0ea943b3b1`:
+    - `dzn_image_layout_to_state` now maps `ATTACHMENT_OPTIMAL` / `READ_ONLY_OPTIMAL` /
+      `STENCIL_READ_ONLY_OPTIMAL` / `SHARED_PRESENT_KHR`. Before, these hit
+      `UNREACHABLE` = `__assume(0)` on the legacy-barrier path; Granite sync2 uses them for every
+      render pass.
+    - `*_ARRAY` views now stay Texture2DArray with 1 layer, where they used to become `TEXTURE2D`
+      against `utexture2DArray` shaders.
+    - `DZN_G64_DISABLE_FIX=layouts,arrayviews` gives A/B.
+  - Built DLL SHA-256 here: `C70444BFB8BF1A8185EA19D5DEE729DDD17E5170FA0AA29E74B04FED4D2D3B0C`.
+    YODA must rebuild its own. `vulkaninfo --summary` showed the new log lines, and the clamp
+    worked (`sm=0x65`).
+  - No D3D12 debug layer is installed here, so the fixes are not proven on a GPU.
+- **gopher64 `2218981`:**
+  - `G64_VI_DISABLE` (ScanoutOptions.vi toggles) and `G64_VI_DUMP_FRAMES` (RDRAM framebuffer +
+    `scanout_sync` BMPs to LocalState).
+  - Two new gated hooks in `interface.cpp`; `main.cpp` sets `G64_LOCALSTATE`.
+  - Fidelity review: PASS, and the inventory row was updated.
+  - The UWP staticlib build passed. The BMP writer and the 5551 decode have no unit test: the first
+    PC run validates them by eye.
+- **Doc 23** is the detailed plan for the next agent: rules, facts, ruled-out list, pipeline map,
+  PC/Xbox difference table, tools, the ordered procedure (Step 0, P1, X1, X2), the decision tree,
+  the cleanup list and references.
+- Nothing was launched on this machine. No Xbox action.

@@ -75,6 +75,7 @@ flowchart LR
 | 20 | [GUI design vision](20-gui-design-vision.md) | Visual identity, menu scope and asset strategy for the P5 gamepad shell |
 | 21 | [First Xbox smoke test](21-first-xbox-smoke-test.md) | Primary solution, local Dozen/DXIL inputs, manual run and log markers |
 | 22 | [Dozen storage investigation](22-dozen-storage-investigation.md) | Xbox capability evidence, reference comparison and incremental plan |
+| 23 | [Xbox visual distortion plan](23-xbox-visual-distortion-plan.md) | Step-by-step plan, tools and fixes for the deterministic Xbox scanline distortion |
 
 ---
 
