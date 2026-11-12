@@ -1689,3 +1689,26 @@ Other changes:
 - Per user request on `YODA` (2026-11-11), pushed `marcelofrau/mesa-uwp` (`gopher64/dzn-xbox` at
   `797c123548e`) and `marcelofrau/gopher64` (`uwp/main`) to `origin` (`SDL3-uwp` and `meson-uwp`
   were already up to date with `origin`) so the other machine can pull directly.
+
+## 2026-11-12 - W11-4NSYSB4: review of YODA's 2026-11-11 work, Xbox distortion triage
+
+- Read-only review on `W11-4NSYSB4` of commits `62ffa30..d34e03c` and the YODA entries above.
+  Fetched `marcelofrau/mesa-uwp`; `origin/gopher64/dzn-xbox` is at `797c123548e` (the local
+  checkout here is still at `364c8b1e0a9`; not updated). `out/uwp-dozen/` does not exist here.
+- Gaps found in the 2026-11-11 evidence:
+  - The headless `rdp_scanout_probe` used two flat colours (`top`/`bot` samples). A flat image
+    cannot reveal horizontal scrambling, so it does not clear the VI path. Rerun it with a
+    per-pixel X/Y gradient and compare every pixel.
+  - `DZN_DEBUG=no16bit,nobindless` (`1b6d9c4`, DLL `3F06E897...`) has only run on Xbox. The PC
+    success used bindless + subgroups. PC F5 with the current build is still the first
+    discriminator.
+- Triage notes for the next run:
+  - The screenshots show correct vertical placement and per-scanline horizontal smearing. That
+    fits `vi_scale.frag` reading wrong `x_start`/`x_add` from `uHorizontalInfo` (an
+    `R32G32B32A32_SINT` texel buffer). Non-bindless Dozen binds that as a typed SRV buffer,
+    unlike the bindless PC path.
+  - Other candidates: the `R8G8B8A8_UINT` UAV/SRV pair between `extract_vram` and `vi_fetch`
+    (M-03), and the 2-layer `uFetchCache`/`uDivotOutput` render targets.
+  - Check whether the OSD text (`create_message_image`) renders cleanly on Xbox. If it does,
+    the final blit and swapchain path are fine.
+- No build, PC launch or Xbox action was run. No code changed.
