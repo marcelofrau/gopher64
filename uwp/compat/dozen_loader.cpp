@@ -45,9 +45,16 @@ extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader() {
         return nullptr;
     }
     // shortcut: hardcoded DZN_DEBUG=no16bit,nobindless so PC reproduces Xbox native16=0 + non-bindless + non-subgroup during bring-up, remove after P3 validation
-    if (!SetEnvironmentVariableW(L"DZN_DEBUG", L"no16bit,nobindless")) {
-        char message[128];
-        std::snprintf(message, sizeof(message), "Dozen: setting DZN_DEBUG=no16bit,nobindless failed: %lu", GetLastError());
+    // Flags already set (host PC-parity default or LocalState/env.txt) are appended, not replaced.
+    std::wstring dzn_debug = L"no16bit,nobindless";
+    wchar_t extra[256] = {};
+    const DWORD extra_length = GetEnvironmentVariableW(L"DZN_DEBUG", extra, 256);
+    if (extra_length && extra_length < 256) dzn_debug += std::wstring(L",") + extra;
+    char dzn_debug_utf8[512] = {};
+    std::snprintf(dzn_debug_utf8, sizeof(dzn_debug_utf8), "%ls", dzn_debug.c_str());
+    if (!SetEnvironmentVariableW(L"DZN_DEBUG", dzn_debug.c_str())) {
+        char message[640];
+        std::snprintf(message, sizeof(message), "Dozen: setting DZN_DEBUG=%s failed: %lu", dzn_debug_utf8, GetLastError());
         gopher64_uwp_log_native(message);
         return nullptr;
     }
@@ -83,10 +90,12 @@ extern "C" PFN_vkGetInstanceProcAddr g64_uwp_dozen_loader() {
     }
     uint32_t version = 5;
     const VkResult result = negotiate(&version);
-    char message[160];
+    char message[640];
     std::snprintf(message, sizeof(message), "Dozen: ICD negotiation result=%d, interface=%u", result, version);
     gopher64_uwp_log_native(message);
     if (result != VK_SUCCESS || version < 5) return nullptr;
-    gopher64_uwp_log_native("Dozen: 8-bit storage and DZN_DEBUG=no16bit,nobindless requested; UWP RDP host import forced off");
+    std::snprintf(message, sizeof(message), "Dozen: 8-bit storage and DZN_DEBUG=%s requested; UWP RDP host import forced off",
+                  dzn_debug_utf8);
+    gopher64_uwp_log_native(message);
     return gipa;
 }

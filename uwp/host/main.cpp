@@ -200,6 +200,10 @@ int main(int, char**) {
         log("package " + std::to_string(version.Major) + "." + std::to_string(version.Minor) + "." +
             std::to_string(version.Build) + "." + std::to_string(version.Revision) + "; device family " +
             utf8(std::wstring(family->Data(), family->Length())) + "; host build " + configuration);
+        // shortcut: PC mimics the assumed Xbox D3D12 caps (D-07); confirm against Xbox G64-DZN-CAPS, env.txt DZN_DEBUG overrides
+        if (std::wstring(family->Data(), family->Length()) != L"Windows.Xbox" &&
+            SetEnvironmentVariableW(L"DZN_DEBUG", L"legacycaps"))
+            log("PC parity: DZN_DEBUG=legacycaps (Dozen legacy barriers/casting/copy pitch)");
     } catch (Platform::Exception^) {
         log("package/device information unavailable");
     }

@@ -558,6 +558,10 @@ bool rdp_init(void *_window, GFX_INFO _gfx_info, const void *font,
   achievement_progress_indicator_image = Vulkan::ImageHandle();
   fps_image = Vulkan::ImageHandle();
   display_fps = false;
+// UWP-PORT: shortcut: FPS OSD always on (Xbox pad has no F1) to check the OSD/blit path, remove after triage (D-07)
+#ifdef GOPHER64_UWP
+  display_fps = true;
+#endif
 
   return true;
 }

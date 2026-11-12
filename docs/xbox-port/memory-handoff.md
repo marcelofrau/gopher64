@@ -1712,3 +1712,44 @@ Other changes:
   - Check whether the OSD text (`create_message_image`) renders cleanly on Xbox. If it does,
     the final blit and swapchain path are fine.
 - No build, PC launch or Xbox action was run. No code changed.
+
+## 2026-11-12 - W11-4NSYSB4: always-on FPS OSD, D3D12 caps log, PC legacy-caps parity
+
+- New lead. Dozen chooses different code paths from D3D12 caps:
+  - `options12.EnhancedBarriersSupported`: barrier model (`dzn_cmd_buffer.c:678`).
+  - `options12.RelaxedFormatCastingSupported`: typeless `MUTABLE_FORMAT` images (`dzn_image.c:76,207`).
+  - `options3.CastingFullyTypedFormatSupported`: view casting (`dzn_image.c:750`).
+  - `options13.UnrestrictedBufferTextureCopyPitchSupported`: copy pitch (`dzn_device.c:3287`).
+- A modern PC reports all four as 1. The Xbox UWP runtime is assumed, but not proven, to report
+  0, so PC and Xbox would run different paths through the same DLL.
+- `../mesa-uwp` `gopher64/dzn-xbox` commit `d0b7c8827ab`, local and not pushed:
+  - Logs one raw `G64-DZN-CAPS:` line per physical device to stderr, before any override.
+  - Adds `DZN_DEBUG=legacycaps`, which clears those four caps.
+  - Built here: `out/mesa-build/src/microsoft/vulkan/vulkan_dzn.dll`, SHA-256
+    `903BCDDEEFFBD4A4E98577E4C04AE76979BC28136603A2BA417DA6804207DCBB`.
+  - `vulkaninfo --summary` with this DLL printed the line for NVIDIA RTX 3500 Ada, Intel Arc and
+    WARP. All showed `enhanced_barriers=1 relaxed_casting=1 unrestricted_pitch=1 cast_fully_typed=1`
+    and `sm=0x68`, and `legacycaps=1` parsed.
+- gopher64 changes:
+  - `parallel-rdp/interface.cpp`: a `GOPHER64_UWP` hook sets `display_fps = true` in `rdp_init`,
+    because the Xbox pad has no F1.
+  - `uwp/host/main.cpp`: on a non-`Windows.Xbox` device family, sets `DZN_DEBUG=legacycaps`
+    before `env.txt` is applied.
+  - `uwp/compat/dozen_loader.cpp`: appends any existing `DZN_DEBUG` to `no16bit,nobindless`
+    instead of replacing it, and logs the final string. On Xbox, `env.txt` can add flags this way.
+- Verification here: Dozen MSBuild Release passed; the UWP staticlib `cargo rustc` passed (it
+  compiles `interface.cpp` and `dozen_loader.cpp`).
+- Not verified here: the change to `uwp/host/main.cpp`, because the host MSIX build is not set up
+  on this machine. No gopher64 run and no Xbox action.
+- Next, on YODA (by the user):
+  1. Pull both repos and rebuild `vulkan_dzn.dll` from `d0b7c8827ab` (doc 22 recipe).
+  2. Run PC F5. Expect `PC parity: DZN_DEBUG=legacycaps`, `DZN_DEBUG=no16bit,nobindless,legacycaps`
+     and `legacycaps=1`. Check whether SM64 distorts like the Xbox.
+  3. Run on Xbox. Record the `G64-DZN-CAPS` line for `SraKmd_arden`, and whether the FPS text
+     renders cleanly.
+- Reading the results:
+  - PC distorts with `legacycaps`: the bug is in a Dozen legacy path. Bisect by clearing one cap at
+    a time on PC.
+  - The Xbox reports any of the four caps as 1: make `legacycaps` match the real Xbox values.
+  - The FPS text is clean on Xbox: the final blit and swapchain path are fine.
+- User rule (2026-11-12): on `W11-4NSYSB4` (corporate), never launch the emulator, a ROM or anything that opens a game window. Only builds and headless checks are allowed there.
