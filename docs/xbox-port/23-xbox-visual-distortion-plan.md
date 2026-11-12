@@ -182,8 +182,14 @@ The "assumed" rows become facts as soon as the Xbox prints its `G64-DZN-CAPS` li
 - **Fix:** in `c0ea943b3b1`, `*_ARRAY` view types are always arrays.
 - **Toggle:** `DZN_G64_DISABLE_FIX=arrayviews`.
 
-Both fixes are in one DLL. `DZN_G64_DISABLE_FIX=layouts,arrayviews` gives the pre-fix behaviour
-from the same DLL.
+Both fixes are in one DLL. `DZN_G64_DISABLE_FIX=layouts,arrayviews` comes close to the pre-fix
+behaviour, but not exactly:
+- `arrayviews` off is exactly the old code.
+- `layouts` off no longer runs into UB. The sync2 layouts become `COMMON` and each one logs a
+  `G64-DZN-WARN ... unhandled layout 1000314001` (ATTACHMENT_OPTIMAL) or `1000314000`
+  (READ_ONLY_OPTIMAL) line, up to 16 lines.
+  - Those lines alone prove the legacy path really runs on that machine.
+- The exact old behaviour is the previous DLL `3F06E897...`, already known to distort on Xbox.
 
 ## 6. Tools now available (all controlled from `LocalState/env.txt`, no rebuild)
 
@@ -210,6 +216,19 @@ from the same DLL.
 `Gopher64.UWP.Dev_<publisher hash>`, then `LocalState`. Download `gopher64-host.log` (and
 `gopher64-host.prev.log`) and `g64-vi-*.bmp`. Upload `env.txt` there. On PC the same folder is
 `%LOCALAPPDATA%\Packages\Gopher64.UWP.Dev_<hash>\LocalState`.
+
+**Viewing BMPs as an agent:** the Read tool shows PNG/JPG, not BMP. Convert first (tested on
+2026-11-12):
+```powershell
+Add-Type -AssemblyName System.Drawing
+Get-ChildItem <folder>\g64-vi-*.bmp | ForEach-Object {
+  $i = [System.Drawing.Image]::FromFile($_.FullName); $i.Save("$($_.FullName).png", [System.Drawing.Imaging.ImageFormat]::Png); $i.Dispose() }
+```
+- Check the PC P1 `rdram.bmp` before trusting any Xbox comparison. It must look like the SM64
+  frame. If colours are swapped or pixels pair-swapped, the probe's RGBA5551 / `^1` decode in
+  `g64_diag.cpp` is wrong. That code has no unit test.
+- Also ask the user what they see. Their description of the FPS text and of the screen is part of
+  the evidence.
 
 ## 7. Procedure
 
