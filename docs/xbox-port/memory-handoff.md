@@ -204,3 +204,6 @@ below. Never delete history.
   PC/Xbox difference table, tools, the ordered procedure (Step 0, P1, X1, X2), the decision tree,
   the cleanup list and references.
 - Nothing was launched on this machine. No Xbox action.
+- Push (user-approved, 2026-11-12, W11-4NSYSB4): `marcelofrau/mesa-uwp` `gopher64/dzn-xbox` is now
+  at `c0ea943b3b1`, and `marcelofrau/gopher64` `uwp/main` includes `17ee9a2`. On YODA, continue
+  with doc 23 §7 Step 0.
